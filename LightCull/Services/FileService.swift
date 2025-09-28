@@ -25,11 +25,13 @@ class FileService {
         }
         
         
-        // 2. Nur JPEG-Dateien herausfiltern
-        let jpegFiles = files.filter { url in
-            let ext = url.pathExtension.lowercased()
-            return ext == "jpg" || ext == "jpeg"
-        }
+        // 2. Nur JPEG-Dateien herausfiltern und nach Dateinamen sortieren
+        let jpegFiles = files
+            .filter { url in
+                let ext = url.pathExtension.lowercased()
+                return ext == "jpg" || ext == "jpeg"
+            }
+            .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
         
         
         // 3. Für jedes JPEG schauen, ob es ein RAW gibt

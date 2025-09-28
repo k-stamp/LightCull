@@ -13,16 +13,18 @@ struct MainView: View {
     
     private let fileService = FileService() // unser Service
     
+    init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
+        _pairs = State(initialValue: pairs)
+        _folderURL = State(initialValue: folderURL)
+    }
+    
     var body: some View {
         NavigationSplitView {
             // SIDEBAR (links)
             sidebarContent
-        } content: {
-            // CONTENT AREA (mitte)
-            contentArea
         } detail: {
-            // DETAIL Area
-            detailArea
+            // CONTENT AREA (rechts) - hier kommt später Bild oben + Thumbnails unten
+            contentArea
         }
     }
     
@@ -89,25 +91,111 @@ struct MainView: View {
     
     // MARK: Content Area
     private var contentArea: some View {
+        VStack(spacing: 0) {
+            mainImageArea
+            thmubnailArea
+        }
+        .background(Color(.controlBackgroundColor))
+    }
+    
+    // MARK: Main Image Area
+    private var mainImageArea: some View {
         VStack {
             Text("Bildvorschau")
                 .font(.title)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(.windowBackgroundColor))
+    }
+
+    // MARK: Thmubnail Area (Placeholder)
+    private var thmubnailArea: some View {
+        VStack {
+            if pairs.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Thumbnail-Leiste")
+                            .font(.headline)
+                            .padding(.leading)
+                    }
+                    
+                    Text("Keine Bilder verfügbar")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 40)
+                }
+            } else {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text("Thumbnail-Leiste")
+                            .font(.headline)
+                            .padding(.leading)
+                        
+                        Spacer()
+                        
+                        Text("\(pairs.count) Bildpaare")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .padding(.trailing)
+                    }
+                    
+                    thumbnailScrollView
+                }
+            }
+        }
+        .frame(height: 150) // Feste Höhe für Thumbnail-Bereich
+        .frame(maxWidth: .infinity)
         .background(Color(.controlBackgroundColor))
     }
     
-    
-    // MARK: Detail Area
-    private var detailArea: some View {
-        VStack {
-            Text("Detail")
-                .font(.title2)
-                .foregroundStyle(.secondary)
+    // MARK: Thumbnail ScrollView
+    private var thumbnailScrollView: some View {
+        ScrollView(.horizontal, showsIndicators: true) {
+            LazyHStack(spacing: 12) {
+                ForEach(pairs) { pair in
+                    thumbnailItem(for: pair)
+                }
+            }
+            .padding(.horizontal)
+            .padding(.bottom, 16)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.controlBackgroundColor))
+    }
+    
+    // MARK: Thumbnail Item (mit korrektem Aspect Ratio)
+    private func thumbnailItem(for pair: ImagePair) -> some View {
+        VStack(spacing: 6) {
+            AsyncImage(url: pair.jpegURL) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+            } placeholder: {
+                Rectangle()
+                    .fill(Color(.quaternaryLabelColor))
+                    .overlay {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                    }
+            }
+            .frame(maxWidth: 100, maxHeight: 100)
+            .clipShape(RoundedRectangle(cornerRadius: 6))
+            .overlay {
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(Color(.separatorColor), lineWidth: 0.5)
+            }
+            
+            // Dateiname ohne Extension
+            Text(pair.jpegURL.deletingPathExtension().lastPathComponent)
+                .font(.caption2)
+                .lineLimit(1)
+                .frame(maxWidth: 100)
+            
+            // RAW Status
+            Text(pair.rawURL != nil ? "RAW✅" : "RAW🚫")
+                .font(.caption2)
+        }
+        .frame(maxWidth: 110)
     }
     
     
@@ -127,6 +215,23 @@ struct MainView: View {
     }
 }
 
-#Preview {
-    MainView()
+#Preview("MainView – Mock Data") {
+    MainView(
+        pairs: [
+            ImagePair(
+                jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+            ),
+            ImagePair(
+                jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
+                rawURL: nil
+            ),
+            ImagePair(
+                jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
+                rawURL: URL(fileURLWithPath: "/mock/image3.arw")
+            )
+        ],
+        folderURL: URL(fileURLWithPath: "/Users/Mock/Pictures")
+    )
+    .frame(minWidth: 900, minHeight: 600)
 }
