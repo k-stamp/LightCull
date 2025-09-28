@@ -1,132 +1,79 @@
 //
-//  ContentView.swift
+//  MainView.swift
 //  LightCull
 //
-//  Created by Kevin Stamp on 23.09.25.
+//  Hauptansicht der App - koordiniert die einzelnen UI-Komponenten
 //
 
 import SwiftUI
 
 struct MainView: View {
-    @State private var pairs: [ImagePair] = []  // Ergebnisliste
-    @State private var folderURL: URL?  // Merkt sich den gewählten Ordner
+    @State private var pairs: [ImagePair] = []
+    @State private var folderURL: URL?
+    @State private var selectedPair: ImagePair?
     
-    private let fileService = FileService() // unser Service
+    // Initialisierung für Tests und Previews
+    init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
+        _pairs = State(initialValue: pairs)
+        _folderURL = State(initialValue: folderURL)
+    }
     
     var body: some View {
         NavigationSplitView {
-            // SIDEBAR (links)
-            sidebarContent
-        } content: {
-            // CONTENT AREA (mitte)
-            contentArea
+            // SIDEBAR: Ordnerauswahl und Info
+            SidebarView(
+                folderURL: $folderURL,
+                pairs: $pairs,
+                onFolderSelected: handleFolderSelection
+            )
         } detail: {
-            // DETAIL Area
-            detailArea
-        }
-    }
-    
-    // MARK: Sidebar Content
-    private var sidebarContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("LightCull")
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
-            
-            Divider()
-            
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Ordner")
-                    .font(.headline)
-                    .padding(.horizontal)
+            // CONTENT AREA: Bildvorschau oben + Thumbnails unten
+            VStack(spacing: 0) {
+                ImageViewerView(selectedImagePair: selectedPair)
                 
-                Button("Ordner auswählen") {
-                    selectFolder()
-                }
-                .padding(.horizontal)
-                
-                if let folderURL {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Gewählter Ordner:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(folderURL.lastPathComponent)
-                            .font(.subheadline)
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal)
-                }
+                ThumbnailBarView(
+                    pairs: pairs,
+                    selectedPair: $selectedPair
+                )
             }
-            
-            Divider()
-            
-            // Info-Bereich
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Info")
-                    .font(.headline)
-                    .padding(.horizontal)
-                
-                if pairs.isEmpty {
-                    Text("Keine Bildpaare gefunden")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
-                } else {
-                    Text("Paare: \(pairs.count)")
-                        .font(.subheadline)
-                        .padding(.horizontal)
-                }
-            }
-            
-            
-            Spacer()
+            .background(Color(.controlBackgroundColor))
         }
-        .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
     }
     
+    // MARK: - Event Handlers
     
-    // MARK: Content Area
-    private var contentArea: some View {
-        VStack {
-            Text("Bildvorschau")
-                .font(.title)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.controlBackgroundColor))
-    }
-    
-    
-    // MARK: Detail Area
-    private var detailArea: some View {
-        VStack {
-            Text("Detail")
-                .font(.title2)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.controlBackgroundColor))
-    }
-    
-    
-    // MARK: Helper Methods
-    
-    // Öffnet den macOS Dialog zur Ordnerwahl
-    private func selectFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        
-        if panel.runModal() == .OK, let url = panel.url {
-            folderURL = url
-            pairs = fileService.findImagePairs(in: url)
-        }
+    /// Wird aufgerufen, wenn ein neuer Ordner ausgewählt wird
+    private func handleFolderSelection(_ url: URL) {
+        // Hier können wir später zusätzliche Logik hinzufügen,
+        // z.B. Caching, Logging, etc.
+        selectedPair = pairs.first
     }
 }
 
-#Preview {
+// MARK: - Previews
+
+#Preview("MainView – Empty") {
     MainView()
+        .frame(minWidth: 900, minHeight: 600)
+}
+
+#Preview("MainView – With Data") {
+    MainView(
+        pairs: [
+            ImagePair(
+                jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+            ),
+            ImagePair(
+                jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
+                rawURL: nil
+            ),
+            ImagePair(
+                jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
+                rawURL: URL(fileURLWithPath: "/mock/image3.arw")
+            )
+        ],
+        folderURL: URL(fileURLWithPath: "/Users/Mock/Pictures")
+    )
+    .frame(minWidth: 900, minHeight: 600)
 }
