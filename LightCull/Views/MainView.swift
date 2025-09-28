@@ -1,18 +1,18 @@
 //
-//  ContentView.swift
+//  MainView.swift
 //  LightCull
 //
-//  Created by Kevin Stamp on 23.09.25.
+//  Hauptansicht der App - koordiniert die einzelnen UI-Komponenten
 //
 
 import SwiftUI
 
 struct MainView: View {
-    @State private var pairs: [ImagePair] = []  // Ergebnisliste
-    @State private var folderURL: URL?  // Merkt sich den gewählten Ordner
+    @State private var pairs: [ImagePair] = []
+    @State private var folderURL: URL?
+    @State private var selectedPair: ImagePair?
     
-    private let fileService = FileService() // unser Service
-    
+    // Initialisierung für Tests und Previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
         _pairs = State(initialValue: pairs)
         _folderURL = State(initialValue: folderURL)
@@ -20,202 +20,44 @@ struct MainView: View {
     
     var body: some View {
         NavigationSplitView {
-            // SIDEBAR (links)
-            sidebarContent
+            // SIDEBAR: Ordnerauswahl und Info
+            SidebarView(
+                folderURL: $folderURL,
+                pairs: $pairs,
+                onFolderSelected: handleFolderSelection
+            )
         } detail: {
-            // CONTENT AREA (rechts) - hier kommt später Bild oben + Thumbnails unten
-            contentArea
-        }
-    }
-    
-    // MARK: Sidebar Content
-    private var sidebarContent: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("LightCull")
-                .font(.title2)
-                .fontWeight(.bold)
-                .padding(.horizontal)
-            
-            Divider()
-            
-            VStack(alignment: .leading, spacing: 12) {
-                Text("Ordner")
-                    .font(.headline)
-                    .padding(.horizontal)
+            // CONTENT AREA: Bildvorschau oben + Thumbnails unten
+            VStack(spacing: 0) {
+                ImageViewerView(selectedImagePair: selectedPair)
                 
-                Button("Ordner auswählen") {
-                    selectFolder()
-                }
-                .padding(.horizontal)
-                
-                if let folderURL {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("Gewählter Ordner:")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                        Text(folderURL.lastPathComponent)
-                            .font(.subheadline)
-                            .lineLimit(1)
-                    }
-                    .padding(.horizontal)
-                }
+                ThumbnailBarView(
+                    pairs: pairs,
+                    selectedPair: $selectedPair
+                )
             }
-            
-            Divider()
-            
-            // Info-Bereich
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Info")
-                    .font(.headline)
-                    .padding(.horizontal)
-                
-                if pairs.isEmpty {
-                    Text("Keine Bildpaare gefunden")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .padding(.horizontal)
-                } else {
-                    Text("Paare: \(pairs.count)")
-                        .font(.subheadline)
-                        .padding(.horizontal)
-                }
-            }
-            
-            
-            Spacer()
-        }
-        .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
-        .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
-    }
-    
-    
-    // MARK: Content Area
-    private var contentArea: some View {
-        VStack(spacing: 0) {
-            mainImageArea
-            thmubnailArea
-        }
-        .background(Color(.controlBackgroundColor))
-    }
-    
-    // MARK: Main Image Area
-    private var mainImageArea: some View {
-        VStack {
-            Text("Bildvorschau")
-                .font(.title)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(.windowBackgroundColor))
-    }
-
-    // MARK: Thmubnail Area (Placeholder)
-    private var thmubnailArea: some View {
-        VStack {
-            if pairs.isEmpty {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Thumbnail-Leiste")
-                            .font(.headline)
-                            .padding(.leading)
-                    }
-                    
-                    Text("Keine Bilder verfügbar")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 40)
-                }
-            } else {
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("Thumbnail-Leiste")
-                            .font(.headline)
-                            .padding(.leading)
-                        
-                        Spacer()
-                        
-                        Text("\(pairs.count) Bildpaare")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .padding(.trailing)
-                    }
-                    
-                    thumbnailScrollView
-                }
-            }
-        }
-        .frame(height: 150) // Feste Höhe für Thumbnail-Bereich
-        .frame(maxWidth: .infinity)
-        .background(Color(.controlBackgroundColor))
-    }
-    
-    // MARK: Thumbnail ScrollView
-    private var thumbnailScrollView: some View {
-        ScrollView(.horizontal, showsIndicators: true) {
-            LazyHStack(spacing: 12) {
-                ForEach(pairs) { pair in
-                    thumbnailItem(for: pair)
-                }
-            }
-            .padding(.horizontal)
-            .padding(.bottom, 16)
+            .background(Color(.controlBackgroundColor))
         }
     }
     
-    // MARK: Thumbnail Item (mit korrektem Aspect Ratio)
-    private func thumbnailItem(for pair: ImagePair) -> some View {
-        VStack(spacing: 6) {
-            AsyncImage(url: pair.jpegURL) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-            } placeholder: {
-                Rectangle()
-                    .fill(Color(.quaternaryLabelColor))
-                    .overlay {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                    }
-            }
-            .frame(maxWidth: 100, maxHeight: 100)
-            .clipShape(RoundedRectangle(cornerRadius: 6))
-            .overlay {
-                RoundedRectangle(cornerRadius: 6)
-                    .stroke(Color(.separatorColor), lineWidth: 0.5)
-            }
-            
-            // Dateiname ohne Extension
-            Text(pair.jpegURL.deletingPathExtension().lastPathComponent)
-                .font(.caption2)
-                .lineLimit(1)
-                .frame(maxWidth: 100)
-            
-            // RAW Status
-            Text(pair.rawURL != nil ? "RAW✅" : "RAW🚫")
-                .font(.caption2)
-        }
-        .frame(maxWidth: 110)
-    }
+    // MARK: - Event Handlers
     
-    
-    // MARK: Helper Methods
-    
-    // Öffnet den macOS Dialog zur Ordnerwahl
-    private func selectFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        
-        if panel.runModal() == .OK, let url = panel.url {
-            folderURL = url
-            pairs = fileService.findImagePairs(in: url)
-        }
+    /// Wird aufgerufen, wenn ein neuer Ordner ausgewählt wird
+    private func handleFolderSelection(_ url: URL) {
+        // Hier können wir später zusätzliche Logik hinzufügen,
+        // z.B. Caching, Logging, etc.
+        selectedPair = pairs.first
     }
 }
 
-#Preview("MainView – Mock Data") {
+// MARK: - Previews
+
+#Preview("MainView – Empty") {
+    MainView()
+        .frame(minWidth: 900, minHeight: 600)
+}
+
+#Preview("MainView – With Data") {
     MainView(
         pairs: [
             ImagePair(
