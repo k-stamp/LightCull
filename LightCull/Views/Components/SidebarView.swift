@@ -11,6 +11,9 @@ struct SidebarView: View {
     @Binding var folderURL: URL?
     @Binding var pairs: [ImagePair]
     
+    // NEU: Metadaten des aktuell ausgewählten Bildes
+    let currentMetadata: ImageMetadata?
+    
     let onFolderSelected: (URL) -> Void
     
     private let fileService = FileService()
@@ -29,6 +32,10 @@ struct SidebarView: View {
             Divider()
             
             infoSection
+            
+            Divider()
+            
+            metadataSection
             
             Spacer()
         }
@@ -82,6 +89,87 @@ struct SidebarView: View {
         }
     }
     
+    // MARK: - Metadata Section (NEU!)
+    
+    /// Zeigt die Metadaten des aktuell ausgewählten Bildes an
+    private var metadataSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Bild-Informationen")
+                .font(.headline)
+                .padding(.horizontal)
+            
+            // Wenn Metadaten vorhanden sind, zeige sie an
+            if let metadata = currentMetadata {
+                VStack(alignment: .leading, spacing: 8) {
+                    // Dateiname
+                    metadataRow(label: "Datei", value: metadata.fileName)
+                    
+                    // Dateigröße
+                    metadataRow(label: "Größe", value: metadata.fileSize)
+                    
+                    // Wenn EXIF-Daten vorhanden sind, zeige Trennlinie
+                    if hasAnyExifData(metadata) {
+                        Divider()
+                            .padding(.horizontal)
+                    }
+                    
+                    // Kamera-Informationen (nur wenn vorhanden)
+                    if let make = metadata.cameraMake {
+                        metadataRow(label: "Marke", value: make)
+                    }
+                    
+                    if let model = metadata.cameraModel {
+                        metadataRow(label: "Modell", value: model)
+                    }
+                    
+                    // Aufnahme-Parameter (nur wenn vorhanden)
+                    if let focalLength = metadata.focalLength {
+                        metadataRow(label: "Brennweite", value: focalLength)
+                    }
+                    
+                    if let aperture = metadata.aperture {
+                        metadataRow(label: "Blende", value: aperture)
+                    }
+                    
+                    if let shutterSpeed = metadata.shutterSpeed {
+                        metadataRow(label: "Belichtung", value: shutterSpeed)
+                    }
+                }
+            } else {
+                // Wenn keine Metadaten vorhanden, zeige Platzhalter
+                Text("Kein Bild ausgewählt")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal)
+            }
+        }
+    }
+    
+    /// Hilfsfunktion: Erstellt eine Zeile mit Label und Wert
+    /// Das ist das typische "Key: Value" Pattern das du aus dem Finder kennst
+    private func metadataRow(label: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            
+            Text(value)
+                .font(.subheadline)
+                .textSelection(.enabled) // Ermöglicht das Kopieren des Wertes
+        }
+        .padding(.horizontal)
+    }
+    
+    /// Prüft ob irgendwelche EXIF-Daten vorhanden sind
+    /// Nützlich um zu entscheiden ob wir eine Trennlinie zeigen
+    private func hasAnyExifData(_ metadata: ImageMetadata) -> Bool {
+        return metadata.cameraMake != nil ||
+               metadata.cameraModel != nil ||
+               metadata.focalLength != nil ||
+               metadata.aperture != nil ||
+               metadata.shutterSpeed != nil
+    }
+    
     // MARK: - Helper Methods
     
     /// Öffnet den macOS Dialog zur Ordnerwahl
@@ -99,10 +187,13 @@ struct SidebarView: View {
     }
 }
 
+// MARK: - Previews
+
 #Preview("SidebarView - Empty") {
     SidebarView(
         folderURL: .constant(nil),
         pairs: .constant([]),
+        currentMetadata: nil,
         onFolderSelected: { _ in }
     )
 }
@@ -120,6 +211,29 @@ struct SidebarView: View {
                 rawURL: nil
             )
         ]),
+        currentMetadata: nil,
+        onFolderSelected: { _ in }
+    )
+}
+
+#Preview("SidebarView - With Metadata") {
+    SidebarView(
+        folderURL: .constant(URL(fileURLWithPath: "/Users/Mock/Pictures")),
+        pairs: .constant([
+            ImagePair(
+                jpegURL: URL(fileURLWithPath: "/mock/image1.jpg"),
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+            )
+        ]),
+        currentMetadata: ImageMetadata(
+            fileName: "DSCF0100.JPG",
+            fileSize: "2.5 MB",
+            cameraMake: "FUJIFILM",
+            cameraModel: "X-T5",
+            focalLength: "35.0 mm",
+            aperture: "f/2.8",
+            shutterSpeed: "1/250s"
+        ),
         onFolderSelected: { _ in }
     )
 }

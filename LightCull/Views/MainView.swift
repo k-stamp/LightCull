@@ -12,8 +12,14 @@ struct MainView: View {
     @State private var folderURL: URL?
     @State private var selectedPair: ImagePair?
     
+    // Metadaten des aktuell ausgewählten Bildes
+    @State private var currentMetadata: ImageMetadata?
+    
     // Shared ViewModel für Zoom-Kontrolle zwischen Viewer und Toolbar
     @StateObject private var imageViewModel = ImageViewModel()
+    
+    // Service zum Laden von Metadaten
+    private let metadataService = MetadataService()
     
     // Initialisierung für Tests und Previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
@@ -27,6 +33,7 @@ struct MainView: View {
             SidebarView(
                 folderURL: $folderURL,
                 pairs: $pairs,
+                currentMetadata: currentMetadata,
                 onFolderSelected: handleFolderSelection
             )
         } detail: {
@@ -51,6 +58,10 @@ struct MainView: View {
                     zoomControlsView
                 }
             }
+        }
+        // Metadaten automatisch laden wenn sich das ausgewählte Bild ändert
+        .onChange(of: selectedPair) { oldValue, newValue in
+                loadMetadataForSelectedPair(newValue)
         }
     }
     
@@ -118,6 +129,26 @@ struct MainView: View {
         // z.B. Caching, Logging, etc.
         selectedPair = pairs.first
     }
+    
+    
+    private func loadMetadataForSelectedPair(_ pair: ImagePair?) {
+        // Wenn kein Bild ausgewählt ist, Metadaten zurücksetzen
+        guard let pair = pair else {
+            currentMetadata = nil
+            return
+        }
+        
+        currentMetadata = metadataService.extractMetadata(from: pair.jpegURL)
+        
+        // Debug-Output (kannst du später entfernen)
+        if let metadata = currentMetadata {
+            print("Metadaten geladen: \(metadata.fileName)")
+        } else {
+            print("Keine Metadaten verfügbar für: \(pair.jpegURL.lastPathComponent)")
+        }
+    }
+    
+    
 }
 
 // MARK: - Previews
