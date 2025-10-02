@@ -36,7 +36,6 @@ struct ImageViewerView: View {
             .background(Color(.windowBackgroundColor))
             
             // Unsichtbare Buttons für Keyboard Shortcuts
-            // Diese werden nie angezeigt, aber die Shortcuts funktionieren
             VStack {
                 Button("Zoom In") { viewModel.zoomIn() }
                     .keyboardShortcut("+", modifiers: .command)
@@ -87,66 +86,64 @@ struct ImageViewerView: View {
     
     /// Das geladene Bild mit Zoom- und Pan-Gesten-Funktionalität
     private func zoomableImageView(image: Image, availableSize: CGSize) -> some View {
-        // GeometryReader um die tatsächliche Bildgröße zu erhalten
-        GeometryReader { imageGeometry in
-            image
-                .resizable()
-                .aspectRatio(contentMode: .fit)
-                .frame(maxWidth: availableSize.width, maxHeight: availableSize.height)
-                // Zoom anwenden
-                .scaleEffect(viewModel.zoomScale * magnificationState)
-                // Position: gespeicherter Offset + temporärer Drag
-                .offset(
-                    x: viewModel.imageOffset.width + dragState.width,
-                    y: viewModel.imageOffset.height + dragState.height
+        image
+            .resizable()
+            .aspectRatio(contentMode: .fit)
+            .frame(maxWidth: availableSize.width, maxHeight: availableSize.height)
+            // Zoom anwenden
+            .scaleEffect(viewModel.zoomScale * magnificationState)
+            // Position: gespeicherter Offset + temporärer Drag
+            .offset(
+                x: viewModel.imageOffset.width + dragState.width,
+                y: viewModel.imageOffset.height + dragState.height
+            )
+            .position(x: availableSize.width / 2, y: availableSize.height / 2)
+            // Kombinierte Gesten: Magnification UND Drag gleichzeitig
+            .gesture(
+                // SimultaneousGesture erlaubt beide Gesten gleichzeitig
+                SimultaneousGesture(
+                    // Magnification-Geste für Trackpad-Zoom
+                    MagnificationGesture()
+                        .updating($magnificationState) { currentState, gestureState, _ in
+                            // Während der Geste: temporäre Skalierung
+                            gestureState = currentState
+                        }
+                        .onEnded { finalMagnification in
+                            // Am Ende der Geste: finale Skalierung anwenden
+                            viewModel.handleMagnification(finalMagnification)
+                        },
+                    
+                    // Drag-Geste für Verschieben mit 2 Fingern (OHNE Klick!)
+                    // minimumDistance: 0 bedeutet: kein Klick nötig!
+                    DragGesture(minimumDistance: 0)
+                        .updating($dragState) { value, gestureState, _ in
+                            // Nur verschieben wenn gezoomt
+                            guard viewModel.isPanEnabled else { return }
+                            
+                            // Während der Geste: temporäre Verschiebung
+                            gestureState = value.translation
+                        }
+                        .onEnded { value in
+                            // Nur verarbeiten wenn gezoomt
+                            guard viewModel.isPanEnabled else { return }
+                            
+                            // Finale Position berechnen und anwenden
+                            let newOffset = CGSize(
+                                width: viewModel.imageOffset.width + value.translation.width,
+                                height: viewModel.imageOffset.height + value.translation.height
+                            )
+                            
+                            // Mit Grenzen-Überprüfung
+                            viewModel.handleDrag(
+                                translation: newOffset,
+                                imageSize: availableSize,
+                                viewSize: availableSize
+                            )
+                            
+                            viewModel.endDrag()
+                        }
                 )
-                .position(x: availableSize.width / 2, y: availableSize.height / 2)
-                // Kombinierte Gesten: Magnification UND Drag gleichzeitig
-                .gesture(
-                    // SimultaneousGesture erlaubt beide Gesten gleichzeitig
-                    SimultaneousGesture(
-                        // Magnification-Geste für Trackpad-Zoom
-                        MagnificationGesture()
-                            .updating($magnificationState) { currentState, gestureState, _ in
-                                // Während der Geste: temporäre Skalierung
-                                gestureState = currentState
-                            }
-                            .onEnded { finalMagnification in
-                                // Am Ende der Geste: finale Skalierung anwenden
-                                viewModel.handleMagnification(finalMagnification)
-                            },
-                        
-                        // Drag-Geste für Verschieben (nur wenn gezoomt)
-                        DragGesture()
-                            .updating($dragState) { value, gestureState, _ in
-                                // Nur verschieben wenn gezoomt
-                                guard viewModel.isPanEnabled else { return }
-                                
-                                // Während der Geste: temporäre Verschiebung
-                                gestureState = value.translation
-                            }
-                            .onEnded { value in
-                                // Nur verarbeiten wenn gezoomt
-                                guard viewModel.isPanEnabled else { return }
-                                
-                                // Finale Position berechnen und anwenden
-                                let newOffset = CGSize(
-                                    width: viewModel.imageOffset.width + value.translation.width,
-                                    height: viewModel.imageOffset.height + value.translation.height
-                                )
-                                
-                                // Mit Grenzen-Überprüfung
-                                viewModel.handleDrag(
-                                    translation: newOffset,
-                                    imageSize: availableSize,
-                                    viewSize: availableSize
-                                )
-                                
-                                viewModel.endDrag()
-                            }
-                    )
-                )
-        }
+            )
     }
     
     // MARK: - State Views
