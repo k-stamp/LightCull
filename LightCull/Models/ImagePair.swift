@@ -8,8 +8,13 @@
 import Foundation
 
 // repräsentiert ein JPEG + RAW Dateipaar
-struct ImagePair: Identifiable {
+struct ImagePair: Identifiable, Equatable {
     let id: UUID = UUID()
     let jpegURL: URL
     let rawURL: URL?
+    
+    // Equatable Implementierung basierend auf den URLs
+    static func == (lhs: ImagePair, rhs: ImagePair) -> Bool {
+        return lhs.jpegURL == rhs.jpegURL && lhs.rawURL == rhs.rawURL
+    }
 }
