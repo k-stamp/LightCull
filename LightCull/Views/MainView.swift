@@ -12,6 +12,9 @@ struct MainView: View {
     @State private var folderURL: URL?
     @State private var selectedPair: ImagePair?
     
+    // Shared ViewModel für Zoom-Kontrolle zwischen Viewer und Toolbar
+    @StateObject private var imageViewModel = ImageViewModel()
+    
     // Initialisierung für Tests und Previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
         _pairs = State(initialValue: pairs)
@@ -29,7 +32,11 @@ struct MainView: View {
         } detail: {
             // CONTENT AREA: Bildvorschau oben + Thumbnails unten
             VStack(spacing: 0) {
-                ImageViewerView(selectedImagePair: selectedPair)
+                // WICHTIG: ViewModel wird hier weitergegeben!
+                ImageViewerView(
+                    selectedImagePair: selectedPair,
+                    viewModel: imageViewModel
+                )
                 
                 ThumbnailBarView(
                     pairs: pairs,
@@ -37,7 +44,76 @@ struct MainView: View {
                 )
             }
             .background(Color(.controlBackgroundColor))
+            // Toolbar am oberen Fensterrand
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    // Zentrierter Titel
+                    Text("LightCull")
+                        .font(.headline)
+                }
+                
+                ToolbarItem(placement: .primaryAction) {
+                    // Zoom-Controls rechts in der Toolbar
+                    zoomControlsView
+                }
+            }
         }
+    }
+    
+    // MARK: - Zoom Controls
+    
+    /// Zoom-Slider und Buttons für die Toolbar
+    private var zoomControlsView: some View {
+        HStack(spacing: 12) {
+            // Zoom Out Button
+            Button(action: {
+                imageViewModel.zoomOut()
+            }) {
+                Image(systemName: "minus.magnifyingglass")
+                    .imageScale(.medium)
+            }
+            .disabled(imageViewModel.isMinZoom)
+            .help("Herauszoomen (⌘-)")
+            
+            // Zoom-Slider mit Prozentanzeige
+            HStack(spacing: 8) {
+                // KORREKTUR: Direktes Binding an @Published Property
+                Slider(
+                    value: $imageViewModel.zoomScale,
+                    in: imageViewModel.minZoom...imageViewModel.maxZoom,
+                    step: 0.01
+                )
+                .frame(width: 120)
+                .disabled(selectedPair == nil)
+                
+                Text("\(imageViewModel.zoomPercentage)%")
+                    .font(.caption)
+                    .monospacedDigit() // Verhindert Springen der Ziffern
+                    .frame(minWidth: 45, alignment: .trailing)
+                    .foregroundStyle(selectedPair == nil ? .secondary : .primary)
+            }
+            
+            // Zoom In Button
+            Button(action: {
+                imageViewModel.zoomIn()
+            }) {
+                Image(systemName: "plus.magnifyingglass")
+                    .imageScale(.medium)
+            }
+            .disabled(imageViewModel.isMaxZoom)
+            .help("Hineinzoomen (⌘+)")
+            
+            // Reset Zoom Button
+            Button(action: {
+                imageViewModel.resetZoom()
+            }) {
+                Image(systemName: "arrow.counterclockwise")
+                    .imageScale(.medium)
+            }
+            .disabled(imageViewModel.isMinZoom)
+            .help("Zoom zurücksetzen (⌘0)")
+        }
+        .disabled(selectedPair == nil)
     }
     
     // MARK: - Event Handlers
