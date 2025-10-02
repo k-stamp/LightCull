@@ -9,14 +9,18 @@ import SwiftUI
 
 struct ImageViewerView: View {
     let selectedImagePair: ImagePair?
-    
+
     // ViewModel für Zoom-State Management
     // Wird von MainView injiziert, damit Toolbar und Viewer synchron sind
     @ObservedObject var viewModel: ImageViewModel
-    
+
+    // Callbacks für Navigation zwischen Bildern
+    let onPreviousImage: () -> Void
+    let onNextImage: () -> Void
+
     // State für Magnification-Geste
     @GestureState private var magnificationState: CGFloat = 1.0
-    
+
     // State für Drag-Geste (temporäre Verschiebung während des Draggings)
     @GestureState private var dragState: CGSize = .zero
     
@@ -40,13 +44,21 @@ struct ImageViewerView: View {
                 Button("Zoom In") { viewModel.zoomIn() }
                     .keyboardShortcut("+", modifiers: .command)
                     .hidden()
-                
+
                 Button("Zoom Out") { viewModel.zoomOut() }
                     .keyboardShortcut("-", modifiers: .command)
                     .hidden()
-                
+
                 Button("Reset Zoom") { viewModel.resetZoom() }
                     .keyboardShortcut("0", modifiers: .command)
+                    .hidden()
+
+                Button("Previous Image") { onPreviousImage() }
+                    .keyboardShortcut(.leftArrow, modifiers: [])
+                    .hidden()
+
+                Button("Next Image") { onNextImage() }
+                    .keyboardShortcut(.rightArrow, modifiers: [])
                     .hidden()
             }
             .frame(width: 0, height: 0)
@@ -210,7 +222,9 @@ struct ImageViewerView: View {
 #Preview("ImageViewerView - Empty State") {
     ImageViewerView(
         selectedImagePair: nil,
-        viewModel: ImageViewModel()
+        viewModel: ImageViewModel(),
+        onPreviousImage: {},
+        onNextImage: {}
     )
     .frame(width: 800, height: 600)
 }
@@ -221,7 +235,9 @@ struct ImageViewerView: View {
             jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
             rawURL: URL(fileURLWithPath: "/mock/image1.raf")
         ),
-        viewModel: ImageViewModel()
+        viewModel: ImageViewModel(),
+        onPreviousImage: {},
+        onNextImage: {}
     )
     .frame(width: 800, height: 600)
 }

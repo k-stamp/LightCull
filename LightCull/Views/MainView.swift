@@ -42,7 +42,9 @@ struct MainView: View {
                 // WICHTIG: ViewModel wird hier weitergegeben!
                 ImageViewerView(
                     selectedImagePair: selectedPair,
-                    viewModel: imageViewModel
+                    viewModel: imageViewModel,
+                    onPreviousImage: selectPreviousImage,
+                    onNextImage: selectNextImage
                 )
                 
                 ThumbnailBarView(
@@ -122,12 +124,32 @@ struct MainView: View {
     }
     
     // MARK: - Event Handlers
-    
+
     /// Wird aufgerufen, wenn ein neuer Ordner ausgewählt wird
     private func handleFolderSelection(_ url: URL) {
         // Hier können wir später zusätzliche Logik hinzufügen,
         // z.B. Caching, Logging, etc.
         selectedPair = pairs.first
+    }
+
+    /// Springt zum vorherigen Bild in der Liste
+    private func selectPreviousImage() {
+        guard let current = selectedPair,
+              let currentIndex = pairs.firstIndex(of: current),
+              currentIndex > 0 else {
+            return
+        }
+        selectedPair = pairs[currentIndex - 1]
+    }
+
+    /// Springt zum nächsten Bild in der Liste
+    private func selectNextImage() {
+        guard let current = selectedPair,
+              let currentIndex = pairs.firstIndex(of: current),
+              currentIndex < pairs.count - 1 else {
+            return
+        }
+        selectedPair = pairs[currentIndex + 1]
     }
     
     
