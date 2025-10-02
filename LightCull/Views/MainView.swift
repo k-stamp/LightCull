@@ -45,13 +45,7 @@ struct MainView: View {
             }
             .background(Color(.controlBackgroundColor))
             // Toolbar am oberen Fensterrand
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    // Zentrierter Titel
-                    Text("LightCull")
-                        .font(.headline)
-                }
-                
+            .toolbar {                
                 ToolbarItem(placement: .primaryAction) {
                     // Zoom-Controls rechts in der Toolbar
                     zoomControlsView
