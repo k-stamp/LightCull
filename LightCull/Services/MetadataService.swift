@@ -87,7 +87,7 @@ class MetadataService {
         }
         
         // Formatierung: Eine Nachkommastelle + " mm"
-        return String(format: "%.1f mm", focalLength)
+        return String(format: "%.0f mm", focalLength)
     }
     
     
