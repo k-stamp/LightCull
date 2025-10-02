@@ -16,7 +16,7 @@ class ImageViewModel: ObservableObject {
     /// Aktueller Zoom-Level (1.0 = 100%, 4.0 = 400%)
     @Published var zoomScale: CGFloat = 1.0
     
-    /// Position des Bildes beim Zoomen (für Pan-Gesten, kommt später)
+    /// Position des Bildes beim Zoomen (für Pan-Gesten)
     @Published var imageOffset: CGSize = .zero
     
     // MARK: - Constants
@@ -45,6 +45,10 @@ class ImageViewModel: ObservableObject {
         let newScale = max(zoomScale - zoomStep, minZoom)
         withAnimation(.easeInOut(duration: 0.2)) {
             zoomScale = newScale
+            // Wenn zurück auf 100%, Offset zurücksetzen
+            if newScale == minZoom {
+                imageOffset = .zero
+            }
         }
     }
     
@@ -61,6 +65,11 @@ class ImageViewModel: ObservableObject {
         // Sicherstellen dass der Wert im erlaubten Bereich liegt
         let clampedScale = min(max(scale, minZoom), maxZoom)
         zoomScale = clampedScale
+        
+        // Wenn zurück auf 100%, Offset zurücksetzen
+        if clampedScale == minZoom {
+            imageOffset = .zero
+        }
     }
     
     /// Behandelt Magnification-Gesten vom Trackpad
@@ -74,6 +83,49 @@ class ImageViewModel: ObservableObject {
         
         // Ohne Animation für flüssige Gesten
         zoomScale = clampedScale
+        
+        // Wenn zurück auf 100%, Offset zurücksetzen
+        if clampedScale == minZoom {
+            imageOffset = .zero
+        }
+    }
+    
+    // MARK: - Pan Actions
+    
+    /// Behandelt Drag-Gesten zum Verschieben des gezoomten Bildes
+    /// - Parameters:
+    ///   - translation: Die Verschiebung in Pixeln
+    ///   - imageSize: Die Größe des Bildes (für Grenzen-Berechnung)
+    ///   - viewSize: Die Größe des View-Bereichs
+    func handleDrag(translation: CGSize, imageSize: CGSize, viewSize: CGSize) {
+        // Pan nur erlauben wenn gezoomt
+        guard zoomScale > minZoom else {
+            imageOffset = .zero
+            return
+        }
+        
+        // Berechne die Grenzen basierend auf Zoom-Level
+        // Das Bild skaliert, also müssen wir die skalierten Dimensionen berücksichtigen
+        let scaledImageWidth = imageSize.width * zoomScale
+        let scaledImageHeight = imageSize.height * zoomScale
+        
+        // Maximale Verschiebung in beide Richtungen
+        // (Halbe Differenz zwischen skaliertem Bild und View)
+        let maxOffsetX = max(0, (scaledImageWidth - viewSize.width) / 2)
+        let maxOffsetY = max(0, (scaledImageHeight - viewSize.height) / 2)
+        
+        // Begrenze den Offset auf die berechneten Maximalwerte
+        let clampedX = min(max(translation.width, -maxOffsetX), maxOffsetX)
+        let clampedY = min(max(translation.height, -maxOffsetY), maxOffsetY)
+        
+        imageOffset = CGSize(width: clampedX, height: clampedY)
+    }
+    
+    /// Wird aufgerufen wenn eine Drag-Geste endet
+    /// Kann für Schwung-Effekte oder Snap-Verhalten genutzt werden
+    func endDrag() {
+        // Momentan nichts tun, aber bereit für zukünftige Features
+        // wie z.B. Schwung-Animation oder Snap-to-Grid
     }
     
     // MARK: - Computed Properties
@@ -91,5 +143,10 @@ class ImageViewModel: ObservableObject {
     /// Prüft ob minimaler Zoom erreicht ist
     var isMinZoom: Bool {
         zoomScale <= minZoom
+    }
+    
+    /// Prüft ob Pan-Funktionalität verfügbar sein sollte
+    var isPanEnabled: Bool {
+        zoomScale > minZoom
     }
 }
