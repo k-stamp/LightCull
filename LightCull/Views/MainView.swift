@@ -161,11 +161,14 @@ struct MainView: View {
         guard let currentPair = selectedPair else {
             return
         }
-        
+
         // ViewModel aufrufen um Tag zu togglen
         imageViewModel.toggleTopTag(for: currentPair) { updatedPair in
-            // Callback: ImagePair im Array aktualisieren
-            updateImagePair(updatedPair)
+            // WICHTIG: UI-Updates MÜSSEN auf dem Main Thread passieren
+            DispatchQueue.main.async {
+                // Callback: ImagePair im Array aktualisieren
+                updateImagePair(updatedPair)
+            }
         }
     }
     
@@ -178,13 +181,16 @@ struct MainView: View {
             print("⚠️ ImagePair nicht im Array gefunden")
             return
         }
-        
+
         // 2. Altes Pair durch neues ersetzen
         pairs[index] = updatedPair
-        
+
         // 3. Auch selectedPair aktualisieren (damit UI synchron bleibt)
+        // WICHTIG: Wir setzen selectedPair auf nil und dann auf updatedPair
+        // Das zwingt SwiftUI, die Änderung zu erkennen und die UI zu aktualisieren
+        selectedPair = nil
         selectedPair = updatedPair
-        
+
         // 4. Debug-Ausgabe
         print("✅ ImagePair aktualisiert: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
     }

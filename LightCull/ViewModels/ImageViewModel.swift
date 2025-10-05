@@ -162,48 +162,56 @@ class ImageViewModel: ObservableObject {
     
     private func addTopTag(to pair: ImagePair, completion: @escaping (ImagePair) -> Void) {
         let jpegSuccess = tagService.addTag("TOP", to: pair.jpegURL)
-        
+
         var rawSuccess = true
         if let rawURL = pair.rawURL {
             rawSuccess = tagService.addTag("TOP", to: rawURL)
         }
-        
+
         // Neues ImagePair mit aktualisiertem Tag-Status erstellen
-        // Wichtig: Wir erstellen ein NEUES ImagePaur, da es ein Struct ist (immutable)
+        // Wichtig: Wir erstellen ein NEUES ImagePair, da es ein Struct ist (immutable)
+        // Der hasTopTag sollte auf TRUE gesetzt werden, wenn wir erfolgreich getaggt haben
         let updatedPair = ImagePair(
-            jpegURL: pair.jpegURL, rawURL: pair.rawURL, hasTopTag: jpegSuccess && rawSuccess
+            jpegURL: pair.jpegURL,
+            rawURL: pair.rawURL,
+            hasTopTag: jpegSuccess && rawSuccess  // TRUE wenn beide Operationen erfolgreich
         )
-        
-        // Callback mit aktualisiertem Pair aufrufen
-        completion(updatedPair)
-        
+
         // Debug-Ausgabe
         if jpegSuccess && rawSuccess {
-            print("✅ TOP-Tag hinzugefügt zu: \(pair.jpegURL.lastPathComponent)")
+            print("✅ TOP-Tag hinzugefügt zu: \(pair.jpegURL.lastPathComponent) - neuer Status: \(updatedPair.hasTopTag)")
         } else {
-            print("❌ Fehler beim Hinzufügen des TOP-Tags")
+            print("❌ Fehler beim Hinzufügen des TOP-Tags - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
         }
+
+        // Callback mit aktualisiertem Pair aufrufen
+        completion(updatedPair)
     }
     
     private func removeTopTag(from pair: ImagePair, completion: @escaping (ImagePair) -> Void) {
         let jpegSuccess = tagService.removeTag("TOP", from: pair.jpegURL)
-        
+
         var rawSuccess = true
         if let rawURL = pair.rawURL {
             rawSuccess = tagService.removeTag("TOP", from: rawURL)
         }
-        
+
+        // Nach dem Entfernen sollte hasTopTag IMMER false sein (auch bei Fehler)
         let updatedPair = ImagePair(
-            jpegURL: pair.jpegURL, rawURL: pair.rawURL, hasTopTag: false
+            jpegURL: pair.jpegURL,
+            rawURL: pair.rawURL,
+            hasTopTag: false  // IMMER false nach removeTag
         )
-        
-        completion(updatedPair)
-        
+
+        // Debug-Ausgabe
         if jpegSuccess && rawSuccess {
-            print("✅ TOP-Tag entfernt von: \(pair.jpegURL.lastPathComponent)")
+            print("✅ TOP-Tag entfernt von: \(pair.jpegURL.lastPathComponent) - neuer Status: \(updatedPair.hasTopTag)")
         } else {
-            print("❌ Fehler beim Entfernen des TOP-Tags")
+            print("❌ Fehler beim Entfernen des TOP-Tags - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
         }
+
+        // Callback mit aktualisiertem Pair aufrufen
+        completion(updatedPair)
     }
     
     
