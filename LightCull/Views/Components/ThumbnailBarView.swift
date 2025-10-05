@@ -132,15 +132,18 @@ struct ThumbnailBarView: View {
         pairs: [
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
-                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2"),
+                hasTopTag: false
             ),
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
-                rawURL: nil
+                rawURL: nil,
+                hasTopTag: false
             ),
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
-                rawURL: URL(fileURLWithPath: "/mock/image3.arw")
+                rawURL: URL(fileURLWithPath: "/mock/image3.arw"),
+                hasTopTag: false
             )
         ],
         selectedPair: .constant(nil)

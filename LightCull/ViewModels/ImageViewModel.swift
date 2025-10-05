@@ -19,6 +19,12 @@ class ImageViewModel: ObservableObject {
     /// Position des Bildes beim Zoomen (für Pan-Gesten)
     @Published var imageOffset: CGSize = .zero
     
+    
+    // MARK: - Dependencies
+    
+    private let tagService: FinderTagService
+    
+    
     // MARK: - Constants
     
     /// Minimaler Zoom-Level (100% = Fensteranpassung)
@@ -29,6 +35,14 @@ class ImageViewModel: ObservableObject {
     
     /// Zoom-Schritte für Tastatur-Shortcuts (25%)
     let zoomStep: CGFloat = 0.25
+    
+    
+    // MARK: - Initializer
+    
+    init(tagService: FinderTagService = FinderTagService()) {
+        self.tagService = tagService
+    }
+    
     
     // MARK: - Zoom Actions
     
@@ -127,6 +141,71 @@ class ImageViewModel: ObservableObject {
         // Momentan nichts tun, aber bereit für zukünftige Features
         // wie z.B. Schwung-Animation oder Snap-to-Grid
     }
+    
+    
+    // MARK: - Tagging Actions
+    
+    /// Togglet den TOP-Tag für ein Bildpaar
+    /// - Parameters:
+    ///     - pair: das Bildpaar das getaggt werden soll
+    ///     - completion: Callback mit dem aktualisierten ImagePair (neuer Tag-Status)
+    func toggleTopTag(for pair: ImagePair, completion: @escaping (ImagePair) -> Void) {
+        // aktuellen Tag-Status umkehren
+        let newTagStatus = !pair.hasTopTag
+        
+        if newTagStatus {
+            addTopTag(to: pair, completion: completion)
+        } else {
+            removeTopTag(from: pair, completion: completion)
+        }
+    }
+    
+    private func addTopTag(to pair: ImagePair, completion: @escaping (ImagePair) -> Void) {
+        let jpegSuccess = tagService.addTag("TOP", to: pair.jpegURL)
+        
+        var rawSuccess = true
+        if let rawURL = pair.rawURL {
+            rawSuccess = tagService.addTag("TOP", to: rawURL)
+        }
+        
+        // Neues ImagePair mit aktualisiertem Tag-Status erstellen
+        // Wichtig: Wir erstellen ein NEUES ImagePaur, da es ein Struct ist (immutable)
+        let updatedPair = ImagePair(
+            jpegURL: pair.jpegURL, rawURL: pair.rawURL, hasTopTag: jpegSuccess && rawSuccess
+        )
+        
+        // Callback mit aktualisiertem Pair aufrufen
+        completion(updatedPair)
+        
+        // Debug-Ausgabe
+        if jpegSuccess && rawSuccess {
+            print("✅ TOP-Tag hinzugefügt zu: \(pair.jpegURL.lastPathComponent)")
+        } else {
+            print("❌ Fehler beim Hinzufügen des TOP-Tags")
+        }
+    }
+    
+    private func removeTopTag(from pair: ImagePair, completion: @escaping (ImagePair) -> Void) {
+        let jpegSuccess = tagService.removeTag("TOP", from: pair.jpegURL)
+        
+        var rawSuccess = true
+        if let rawURL = pair.rawURL {
+            rawSuccess = tagService.removeTag("TOP", from: rawURL)
+        }
+        
+        let updatedPair = ImagePair(
+            jpegURL: pair.jpegURL, rawURL: pair.rawURL, hasTopTag: false
+        )
+        
+        completion(updatedPair)
+        
+        if jpegSuccess && rawSuccess {
+            print("✅ TOP-Tag entfernt von: \(pair.jpegURL.lastPathComponent)")
+        } else {
+            print("❌ Fehler beim Entfernen des TOP-Tags")
+        }
+    }
+    
     
     // MARK: - Computed Properties
     

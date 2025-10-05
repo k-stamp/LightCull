@@ -10,14 +10,17 @@ import XCTest
 
 final class FileServiceTests: XCTestCase {
     var fileService: FileService!
+    var tagService: FinderTagService!
     
     override func setUp() {
         super.setUp()
-        fileService = FileService()
+        tagService = FinderTagService()
+        fileService = FileService(tagService: tagService)
     }
     
     override func tearDown() {
         fileService = nil
+        tagService = nil
         super.tearDown()
     }
     
@@ -48,5 +51,68 @@ final class FileServiceTests: XCTestCase {
         XCTAssertTrue(namesWithRaw.contains("DSCF0100"), "DSCF0100.jpg sollte ein RAW haben")
         XCTAssertTrue(namesWithRaw.contains("DSCF0102"), "DSCF0102.jpg sollte ein RAW haben")
         XCTAssertTrue(namesWithRaw.contains("DSCF0103"), "DSCF0103.jpg sollte ein RAW haben")
+    }
+    
+    func testImagePairsHaveTagStatus() {
+        // 1. Temporären Test-Ordner erstellen
+        let tempDirectory = FileManager.default.temporaryDirectory
+        let testFolderURL = tempDirectory.appendingPathComponent("LightCullTest_\(UUID().uuidString)")
+        
+        do {
+            try FileManager.default.createDirectory(at: testFolderURL, withIntermediateDirectories: true)
+        } catch {
+            XCTFail("Konnte temporären Ordner nicht erstellen: \(error)")
+            return
+        }
+        
+        // 2. Test-Bilder aus Bundle in temp Ordner kopieren
+        let bundle = Bundle(for: type(of: self))
+        guard let sourceFolder = bundle.url(forResource: "TestResources", withExtension: nil) else {
+            XCTFail("TestResources folder not found")
+            return
+        }
+        
+        // Kopiere DSCF0100.JPG und DSCF0101.JPG
+        let filesToCopy = ["DSCF0100.JPG", "DSCF0101.JPG"]
+        for fileName in filesToCopy {
+            let sourceURL = sourceFolder.appendingPathComponent(fileName)
+            let destURL = testFolderURL.appendingPathComponent(fileName)
+            
+            do {
+                try FileManager.default.copyItem(at: sourceURL, to: destURL)
+            } catch {
+                XCTFail("Konnte \(fileName) nicht kopieren: \(error)")
+                return
+            }
+        }
+        
+        // 3. Ein Test-Bild taggen (DSCF0100)
+        let testImageURL = testFolderURL.appendingPathComponent("DSCF0100.JPG")
+        let tagSuccess = tagService.addTag("TOP", to: testImageURL)
+        XCTAssertTrue(tagSuccess, "Tag sollte erfolgreich hinzugefügt werden")
+        
+        // 4. ImagePairs laden
+        let pairs = fileService.findImagePairs(in: testFolderURL)
+        
+        // 5. Das getaggte Bild finden
+        guard let taggedPair = pairs.first(where: { $0.jpegURL.lastPathComponent == "DSCF0100.JPG" }) else {
+            XCTFail("DSCF0100.JPG sollte gefunden werden")
+            return
+        }
+        
+        // TEST: Das getaggte Bild sollte hasTopTag = true haben
+        XCTAssertTrue(taggedPair.hasTopTag, "DSCF0100.JPG sollte als getaggt erkannt werden")
+        
+        // 6. Ein nicht-getaggtes Bild prüfen
+        guard let untaggedPair = pairs.first(where: { $0.jpegURL.lastPathComponent == "DSCF0101.JPG" }) else {
+            XCTFail("DSCF0101.JPG sollte gefunden werden")
+            return
+        }
+        
+        // TEST: Das nicht-getaggte Bild sollte hasTopTag = false haben
+        XCTAssertFalse(untaggedPair.hasTopTag, "DSCF0101.JPG sollte nicht getaggt sein")
+        
+        // 7. Cleanup: Temporären Ordner löschen
+        try? FileManager.default.removeItem(at: testFolderURL)
     }
 }

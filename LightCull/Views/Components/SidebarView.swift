@@ -204,11 +204,13 @@ struct SidebarView: View {
         pairs: .constant([
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/mock/image1.jpg"),
-                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2"),
+                hasTopTag: false
             ),
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/mock/image2.jpg"),
-                rawURL: nil
+                rawURL: nil,
+                hasTopTag: false
             )
         ]),
         currentMetadata: nil,
@@ -222,7 +224,8 @@ struct SidebarView: View {
         pairs: .constant([
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/mock/image1.jpg"),
-                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2"),
+                hasTopTag: false
             )
         ]),
         currentMetadata: ImageMetadata(

@@ -44,7 +44,7 @@ class FinderTagService {
     @discardableResult
     func removeTag(_ tag: String, from url: URL) -> Bool {
         guard var currentTags = getTags(from: url) else {
-            return false
+            return true
         }
         
         // Tag aus dem Array entfernen

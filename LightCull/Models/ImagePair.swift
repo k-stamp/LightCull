@@ -12,6 +12,7 @@ struct ImagePair: Identifiable, Equatable {
     let id: UUID = UUID()
     let jpegURL: URL
     let rawURL: URL?
+    let hasTopTag: Bool
     
     // Equatable Implementierung basierend auf den URLs
     static func == (lhs: ImagePair, rhs: ImagePair) -> Bool {

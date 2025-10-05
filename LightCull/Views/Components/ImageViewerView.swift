@@ -17,6 +17,9 @@ struct ImageViewerView: View {
     // Callbacks für Navigation zwischen Bildern
     let onPreviousImage: () -> Void
     let onNextImage: () -> Void
+    
+    // NEU: Callback für Tag-Toggle
+    let onToggleTag: () -> Void
 
     // State für Magnification-Geste
     @GestureState private var magnificationState: CGFloat = 1.0
@@ -59,6 +62,11 @@ struct ImageViewerView: View {
 
                 Button("Next Image") { onNextImage() }
                     .keyboardShortcut(.rightArrow, modifiers: [])
+                    .hidden()
+                
+                // NEU: Keyboard Shortcut für Tag-Toggle
+                Button("Toggle TOP Tag") { onToggleTag() }
+                    .keyboardShortcut("t", modifiers: [])
                     .hidden()
             }
             .frame(width: 0, height: 0)
@@ -224,7 +232,8 @@ struct ImageViewerView: View {
         selectedImagePair: nil,
         viewModel: ImageViewModel(),
         onPreviousImage: {},
-        onNextImage: {}
+        onNextImage: {},
+        onToggleTag: {}
     )
     .frame(width: 800, height: 600)
 }
@@ -233,11 +242,13 @@ struct ImageViewerView: View {
     ImageViewerView(
         selectedImagePair: ImagePair(
             jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
-            rawURL: URL(fileURLWithPath: "/mock/image1.raf")
+            rawURL: URL(fileURLWithPath: "/mock/image1.raf"),
+            hasTopTag: false
         ),
         viewModel: ImageViewModel(),
         onPreviousImage: {},
-        onNextImage: {}
+        onNextImage: {},
+        onToggleTag: {}
     )
     .frame(width: 800, height: 600)
 }
