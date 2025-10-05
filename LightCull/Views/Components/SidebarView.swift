@@ -178,11 +178,15 @@ struct SidebarView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        
+
         if panel.runModal() == .OK, let url = panel.url {
             folderURL = url
-            pairs = fileService.findImagePairs(in: url)
+
+            // WICHTIG: Security-Scoped Access ZUERST starten (in MainView)
             onFolderSelected(url)
+
+            // DANN erst die Dateien scannen (benötigt den Access um Tags zu lesen)
+            pairs = fileService.findImagePairs(in: url)
         }
     }
 }

@@ -77,11 +77,13 @@ class FinderTagService {
     /// - Returns: Array mit Tag-Namen, oder nil bei Fehler
     private func getTags(from url: URL) -> [String]? {
         // URLResourceValues ist ein Container für Datei-Metadaten
+        // WICHTIG: Der Security-Scoped Access muss vom ORDNER kommen (nicht von der Datei)
+        // Der Ordner-Access wird in MainView.handleFolderSelection() gestartet
         guard let resourceValues = try? url.resourceValues(forKeys: [.tagNamesKey]) else {
             print("Fehler beim Lesen der resource Values von: \(url.lastPathComponent)")
             return nil
         }
-        
+
         return resourceValues.tagNames
     }
     
@@ -94,16 +96,21 @@ class FinderTagService {
     private func setTags(_ tags: [String], to url: URL) -> Bool {
         var resourceValues = URLResourceValues()
         resourceValues.tagNames = tags
-        
+
         // wichtig! url muss als var deklariert werden, da setResourcesValues eine mutating Methode ist
         var mutableURL = url
-        
+
+        // WICHTIG: Der Security-Scoped Access muss vom ORDNER kommen (nicht von der Datei)
+        // Der Ordner-Access wird in MainView.handleFolderSelection() gestartet
+        // und bleibt aktiv, solange der Ordner ausgewählt ist
+
         do {
             // Tags zur Datei schreiben
             try mutableURL.setResourceValues(resourceValues)
+            print("✅ Tags erfolgreich geschrieben zu \(url.lastPathComponent)")
             return true
         } catch {
-            print("Fehler beim Schreiben der Tags zu \(url.lastPathComponent): \(error.localizedDescription)")
+            print("❌ Fehler beim Schreiben der Tags zu \(url.lastPathComponent): \(error.localizedDescription)")
             return false
         }
     }
