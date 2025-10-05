@@ -9,6 +9,21 @@ import Foundation
 
 class FileService {
     
+    // MARK: - Dependencies
+    private let tagService: FinderTagService
+    
+    
+    // MARK: - Initializer
+    
+    /// Initialisiert den FileService mit einem TagService
+    /// - Parameter tagService: Der Service zum Lesen von Finder-Tags
+    init(tagService: FinderTagService = FinderTagService()) {
+        self.tagService = tagService
+    }
+    
+    
+    // MARK: - Public Methods
+    
     // findet JPEG/RAW-Paare im angegebenen Ordner
     func findImagePairs(in folder: URL) -> [ImagePair] {
         var pairs: [ImagePair] = []
@@ -42,8 +57,12 @@ class FileService {
             let rawCandidate = folder.appendingPathComponent("\(baseName).RAF")
             let rawURL = fileManager.fileExists(atPath: rawCandidate.path) ? rawCandidate : nil
             
+            // Top-Tag Status prüfen (wir pürfen die JPEG-Datei, nicht die RAW. Beim taggen werden
+            // beide getaggt, aber zum Lesen reicht JPEG)
+            let hasTopTag = tagService.hasTag("TOP", at: jpeg)
+            
             // neues ImagePair hinzufügen
-            let pair = ImagePair(jpegURL: jpeg, rawURL: rawURL)
+            let pair = ImagePair(jpegURL: jpeg, rawURL: rawURL, hasTopTag: hasTopTag)
             pairs.append(pair)
         }
         

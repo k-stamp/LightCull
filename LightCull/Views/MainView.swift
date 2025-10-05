@@ -12,11 +12,17 @@ struct MainView: View {
     @State private var folderURL: URL?
     @State private var selectedPair: ImagePair?
     
+    // NEU: Tracking für Security-Scoped Access
+    @State private var isAccessingSecurityScope = false
+    
     // Metadaten des aktuell ausgewählten Bildes
     @State private var currentMetadata: ImageMetadata?
     
     // Shared ViewModel für Zoom-Kontrolle zwischen Viewer und Toolbar
     @StateObject private var imageViewModel = ImageViewModel()
+    
+    // NEU: Service zum Verwalten von Finder-Tags
+    private let tagService = FinderTagService()
     
     // Service zum Laden von Metadaten
     private let metadataService = MetadataService()
@@ -44,7 +50,8 @@ struct MainView: View {
                     selectedImagePair: selectedPair,
                     viewModel: imageViewModel,
                     onPreviousImage: selectPreviousImage,
-                    onNextImage: selectNextImage
+                    onNextImage: selectNextImage,
+                    onToggleTag: handleToggleTag  // NEU: Callback für Tag-Toggle
                 )
                 
                 ThumbnailBarView(
@@ -54,7 +61,12 @@ struct MainView: View {
             }
             .background(Color(.controlBackgroundColor))
             // Toolbar am oberen Fensterrand
-            .toolbar {                
+            .toolbar {
+                // NEU: Tag-Button links in der Toolbar
+                ToolbarItem(placement: .navigation) {
+                    tagButtonView
+                }
+                
                 ToolbarItem(placement: .primaryAction) {
                     // Zoom-Controls rechts in der Toolbar
                     zoomControlsView
@@ -65,6 +77,25 @@ struct MainView: View {
         .onChange(of: selectedPair) { oldValue, newValue in
                 loadMetadataForSelectedPair(newValue)
         }
+        // NEU: Cleanup bei View-Verschwinden
+        .onDisappear {
+            stopSecurityScopedAccess()
+        }
+    }
+    
+    // MARK: - Tag Button (NEU!)
+    
+    /// Tag-Button für die Toolbar
+    private var tagButtonView: some View {
+        Button(action: {
+            handleToggleTag()
+        }) {
+            Image(systemName: selectedPair?.hasTopTag == true ? "star.fill" : "star")
+                .imageScale(.medium)
+                .foregroundStyle(selectedPair?.hasTopTag == true ? .yellow : .primary)
+        }
+        .disabled(selectedPair == nil)
+        .help("Als TOP markieren/entfernen (T)")
     }
     
     // MARK: - Zoom Controls
@@ -124,12 +155,75 @@ struct MainView: View {
     }
     
     // MARK: - Event Handlers
+    
+    /// Behandelt das Toggling des TOP-Tags für das aktuell ausgewählte Bild
+    private func handleToggleTag() {
+        guard let currentPair = selectedPair else {
+            return
+        }
+
+        // ViewModel aufrufen um Tag zu togglen
+        imageViewModel.toggleTopTag(for: currentPair) { updatedPair in
+            // WICHTIG: UI-Updates MÜSSEN auf dem Main Thread passieren
+            DispatchQueue.main.async {
+                // Callback: ImagePair im Array aktualisieren
+                updateImagePair(updatedPair)
+            }
+        }
+    }
+    
+    /// Aktualisiert ein ImagePair im pairs-Array
+    /// - Parameter updatedPair: Das aktualisierte ImagePair mit neuem Tag-Status
+    private func updateImagePair(_ updatedPair: ImagePair) {
+        // 1. Index des alten Pairs finden
+        // Wir nutzen Equatable (basierend auf URLs), nicht auf hasTopTag!
+        guard let index = pairs.firstIndex(where: { $0 == updatedPair }) else {
+            print("⚠️ ImagePair nicht im Array gefunden")
+            return
+        }
+
+        // 2. Altes Pair durch neues ersetzen
+        pairs[index] = updatedPair
+
+        // 3. Auch selectedPair aktualisieren (damit UI synchron bleibt)
+        // WICHTIG: Wir setzen selectedPair auf nil und dann auf updatedPair
+        // Das zwingt SwiftUI, die Änderung zu erkennen und die UI zu aktualisieren
+        selectedPair = nil
+        selectedPair = updatedPair
+
+        // 4. Debug-Ausgabe
+        print("✅ ImagePair aktualisiert: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
+    }
+
+    // MARK: - Navigation Handlers
 
     /// Wird aufgerufen, wenn ein neuer Ordner ausgewählt wird
     private func handleFolderSelection(_ url: URL) {
-        // Hier können wir später zusätzliche Logik hinzufügen,
-        // z.B. Caching, Logging, etc.
+        // WICHTIG: Erst alten Access stoppen
+        stopSecurityScopedAccess()
+        
+        // NEU: Security-Scoped Access für den ausgewählten Ordner starten
+        isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
+        
+        if !isAccessingSecurityScope {
+            print("⚠️ Konnte Security-Scoped Access nicht starten für: \(url.path)")
+        } else {
+            print("✅ Security-Scoped Access gestartet für: \(url.path)")
+        }
+        
+        // Erstes Bild auswählen
         selectedPair = pairs.first
+    }
+    
+    /// Stoppt den Security-Scoped Access für den aktuellen Ordner
+    private func stopSecurityScopedAccess() {
+        guard isAccessingSecurityScope, let url = folderURL else {
+            return
+        }
+        
+        url.stopAccessingSecurityScopedResource()
+        isAccessingSecurityScope = false
+        print("🛑 Security-Scoped Access gestoppt für: \(url.path)")
     }
 
     /// Springt zum vorherigen Bild in der Liste
@@ -152,6 +246,7 @@ struct MainView: View {
         selectedPair = pairs[currentIndex + 1]
     }
     
+    // MARK: - Metadata Loading
     
     private func loadMetadataForSelectedPair(_ pair: ImagePair?) {
         // Wenn kein Bild ausgewählt ist, Metadaten zurücksetzen
@@ -185,15 +280,18 @@ struct MainView: View {
         pairs: [
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
-                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2"),
+                hasTopTag: true
             ),
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
-                rawURL: nil
+                rawURL: nil,
+                hasTopTag: false
             ),
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
-                rawURL: URL(fileURLWithPath: "/mock/image3.arw")
+                rawURL: URL(fileURLWithPath: "/mock/image3.arw"),
+                hasTopTag: false
             )
         ],
         folderURL: URL(fileURLWithPath: "/Users/Mock/Pictures")

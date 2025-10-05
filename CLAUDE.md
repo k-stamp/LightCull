@@ -9,7 +9,6 @@ LightCull is a macOS SwiftUI application for viewing and managing photo pairs (J
 ## Building and Testing
 
 ### Build Commands
-Since Xcode is not installed (only Command Line Tools), use Xcode.app directly:
 - Open project: `open LightCull.xcodeproj`
 - Build in Xcode: ⌘B
 - Run in Xcode: ⌘R
@@ -17,7 +16,11 @@ Since Xcode is not installed (only Command Line Tools), use Xcode.app directly:
 ### Testing
 - Run all tests in Xcode: ⌘U
 - Test target: `LightCullTests`
-- Test files include resource bundles (TestResources folder with sample JPEG/RAF pairs)
+- Key test files:
+  - `FileServiceTests`: Validates JPEG/RAW pairing and tag reading
+  - `ImageViewModelTests`: Tests zoom/pan logic and tag toggling
+  - `FinderTagServiceTests`: Tests macOS Finder tag operations
+- Test resources: `TestResources` folder with 5 JPEGs and 3 matching RAF files
 
 ## Architecture
 
@@ -44,8 +47,11 @@ The app uses a **shared ViewModel pattern** for cross-component state synchroniz
    - `ThumbnailBarView`: Horizontal scrolling thumbnail strip with selection
 
 3. **Services & Models**
-   - `FileService`: Scans folders for JPEG files, matches with .RAF RAW files by basename
-   - `ImagePair`: Model representing JPEG+RAW pair (RAW is optional)
+   - `FileService`: Scans folders for JPEG files, matches with .RAF RAW files by basename, reads Finder tags
+   - `FinderTagService`: Manages macOS Finder tags (add/remove/check tags on files)
+   - `MetadataService`: Extracts EXIF data from images using ImageIO framework
+   - `ImagePair`: Model representing JPEG+RAW pair (RAW is optional, includes `hasTopTag` boolean)
+   - `ImageMetadata`: Model for EXIF data (camera make/model, focal length, aperture, shutter speed)
 
 ### Key Implementation Details
 
@@ -68,18 +74,80 @@ The app uses a **shared ViewModel pattern** for cross-component state synchroniz
 - Only JPEG files create pairs; orphaned RAW files are ignored
 - Files sorted using `localizedStandardCompare` for natural ordering
 
+**Finder Tag Integration:**
+- Uses macOS URLResourceValues API with `.tagNamesKey` to read/write tags
+- "TOP" tag marks favorite images for culling workflow
+- Tags applied to BOTH JPEG and RAW files in a pair
+- `FinderTagService` provides: `addTag()`, `removeTag()`, `hasTag()`
+- Tag status checked on JPEG file only (both files tagged together)
+- **Important**: `setResourceValues()` requires mutable URL (`var`)
+
+**EXIF Metadata Extraction:**
+- Uses `CGImageSource` API to read metadata without loading full image
+- Extracts from EXIF dictionary: focal length, aperture (f-number), shutter speed
+- Camera make/model stored in TIFF dictionary, not EXIF
+- Shutter speed formatted as fraction (1/250s) or decimal (2.5s)
+- File size formatted with `ByteCountFormatter` (KB/MB only)
+
+**Security-Scoped Resource Access:**
+- Required for sandboxed app to access user-selected folders
+- `startAccessingSecurityScopedResource()` called when folder selected
+- `stopAccessingSecurityScopedResource()` called on folder change or view disappear
+- Access state tracked with `isAccessingSecurityScope` boolean
+- **Critical**: Must stop old access before starting new access
+
+### Immutable Data Model Pattern
+
+`ImagePair` is an immutable struct - when tag status changes, a new instance is created:
+
+```swift
+// In ImageViewModel.toggleTopTag():
+let updatedPair = ImagePair(
+    jpegURL: pair.jpegURL,
+    rawURL: pair.rawURL,
+    hasTopTag: newStatus
+)
+completion(updatedPair)  // MainView replaces old pair in array
+```
+
+This ensures SwiftUI change detection works correctly. When updating pairs:
+1. Find index in array using `Equatable` (compares URLs, not hasTopTag)
+2. Replace entire pair at that index
+3. Update `selectedPair` to maintain UI synchronization
+
+### Dependency Injection Pattern
+
+Services use constructor injection with default parameters for testability:
+
+```swift
+class FileService {
+    private let tagService: FinderTagService
+    init(tagService: FinderTagService = FinderTagService()) {
+        self.tagService = tagService
+    }
+}
+```
+
+This pattern allows:
+- Production code uses default instances (`FileService()`)
+- Tests inject mocks (`FileService(tagService: mockTagService)`)
+- Applies to: `FileService`, `ImageViewModel`
+
 ### German Comments
 
 The codebase contains German comments throughout. This is intentional and should be preserved when modifying code. English variable/function names are used, but comments explain logic in German.
 
 ## Current Features
 
-- Folder selection and JPEG/RAW pairing
+- Folder selection and JPEG/RAW pairing (Fujifilm .RAF format)
 - Image viewer with AsyncImage loading
-- Zoom: 100-400% with multiple input methods
+- Zoom: 100-400% with multiple input methods (toolbar, slider, keyboard, trackpad)
 - Pan: Constrained dragging when zoomed
 - Thumbnail bar with selection state
-- Keyboard shortcuts for zoom operations
+- Keyboard shortcuts: ⌘+/⌘- (zoom), ⌘0 (reset), T (toggle TOP tag), ← → (navigate)
+- Finder tag management: Mark images as "TOP" for culling
+- EXIF metadata display: Camera info, focal length, aperture, shutter speed
+- Security-scoped resource access for sandboxed operation
 
 ## Test Resources
 

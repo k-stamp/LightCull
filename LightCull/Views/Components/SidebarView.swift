@@ -178,11 +178,15 @@ struct SidebarView: View {
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
-        
+
         if panel.runModal() == .OK, let url = panel.url {
             folderURL = url
-            pairs = fileService.findImagePairs(in: url)
+
+            // WICHTIG: Security-Scoped Access ZUERST starten (in MainView)
             onFolderSelected(url)
+
+            // DANN erst die Dateien scannen (benötigt den Access um Tags zu lesen)
+            pairs = fileService.findImagePairs(in: url)
         }
     }
 }
@@ -204,11 +208,13 @@ struct SidebarView: View {
         pairs: .constant([
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/mock/image1.jpg"),
-                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2"),
+                hasTopTag: false
             ),
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/mock/image2.jpg"),
-                rawURL: nil
+                rawURL: nil,
+                hasTopTag: false
             )
         ]),
         currentMetadata: nil,
@@ -222,7 +228,8 @@ struct SidebarView: View {
         pairs: .constant([
             ImagePair(
                 jpegURL: URL(fileURLWithPath: "/mock/image1.jpg"),
-                rawURL: URL(fileURLWithPath: "/mock/image1.cr2")
+                rawURL: URL(fileURLWithPath: "/mock/image1.cr2"),
+                hasTopTag: false
             )
         ]),
         currentMetadata: ImageMetadata(
