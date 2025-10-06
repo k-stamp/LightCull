@@ -17,9 +17,12 @@ struct ImageViewerView: View {
     // Callbacks für Navigation zwischen Bildern
     let onPreviousImage: () -> Void
     let onNextImage: () -> Void
-    
+
     // NEU: Callback für Tag-Toggle
     let onToggleTag: () -> Void
+
+    // NEU: Callback für Delete
+    let onDeleteImage: () -> Void
 
     // State für Magnification-Geste
     @GestureState private var magnificationState: CGFloat = 1.0
@@ -67,6 +70,11 @@ struct ImageViewerView: View {
                 // NEU: Keyboard Shortcut für Tag-Toggle
                 Button("Toggle TOP Tag") { onToggleTag() }
                     .keyboardShortcut("t", modifiers: [])
+                    .hidden()
+
+                // NEU: Keyboard Shortcut für Delete
+                Button("Delete Image") { onDeleteImage() }
+                    .keyboardShortcut("d", modifiers: [])
                     .hidden()
             }
             .frame(width: 0, height: 0)
@@ -233,7 +241,8 @@ struct ImageViewerView: View {
         viewModel: ImageViewModel(),
         onPreviousImage: {},
         onNextImage: {},
-        onToggleTag: {}
+        onToggleTag: {},
+        onDeleteImage: {}
     )
     .frame(width: 800, height: 600)
 }
@@ -248,7 +257,8 @@ struct ImageViewerView: View {
         viewModel: ImageViewModel(),
         onPreviousImage: {},
         onNextImage: {},
-        onToggleTag: {}
+        onToggleTag: {},
+        onDeleteImage: {}
     )
     .frame(width: 800, height: 600)
 }

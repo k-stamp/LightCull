@@ -61,7 +61,8 @@ struct MainView: View {
                         viewModel: imageViewModel,
                         onPreviousImage: selectPreviousImage,
                         onNextImage: selectNextImage,
-                        onToggleTag: handleToggleTag  // NEU: Callback für Tag-Toggle
+                        onToggleTag: handleToggleTag,  // NEU: Callback für Tag-Toggle
+                        onDeleteImage: handleDelete  // NEU: Callback für Delete
                     )
 
                     ThumbnailBarView(
@@ -77,6 +78,10 @@ struct MainView: View {
                 VStack {
                     Button("Rename Selected") { handleRenameButtonClicked() }
                         .keyboardShortcut("n", modifiers: .command)
+                        .hidden()
+
+                    Button("Undo Delete") { handleUndo() }
+                        .keyboardShortcut("z", modifiers: .command)
                         .hidden()
                 }
                 .frame(width: 0, height: 0)
@@ -101,6 +106,11 @@ struct MainView: View {
         // NEU: Cleanup bei View-Verschwinden
         .onDisappear {
             stopSecurityScopedAccess()
+        }
+        // NEU: Delete-History löschen wenn Ordner wechselt
+        .onChange(of: folderURL) { oldValue, newValue in
+            // Bei Ordnerwechsel die Delete-History löschen
+            imageViewModel.clearDeleteHistory()
         }
         // NEU: Rename-Sheet anzeigen
         .sheet(isPresented: $showRenameSheet) {
@@ -310,6 +320,119 @@ struct MainView: View {
 
         print("✅ Ordner neu gescannt - \(pairs.count) Pairs gefunden")
     }
+
+    // MARK: - Delete Handlers (NEU!)
+
+    /// Wird aufgerufen, wenn der "D"-Shortcut gedrückt wird
+    private func handleDelete() {
+        // 1. Gibt es überhaupt ein ausgewähltes Bild?
+        guard let currentPair = selectedPair else {
+            print("⚠️ Kein Bild ausgewählt - kann nicht löschen")
+            return
+        }
+
+        // 2. Gibt es einen ausgewählten Ordner?
+        guard let folder = folderURL else {
+            print("⚠️ Kein Ordner ausgewählt - kann nicht löschen")
+            return
+        }
+
+        // 3. Index des aktuellen Bildes merken (für Navigation nach Delete)
+        let currentIndex: Int? = pairs.firstIndex(of: currentPair)
+
+        print("🗑️ Lösche Bild: \(currentPair.jpegURL.lastPathComponent)")
+
+        // 4. ViewModel aufrufen um das Bild zu löschen
+        imageViewModel.deleteImagePair(pair: currentPair, in: folder) { success in
+            // Callback wird aufgerufen wenn Delete fertig ist
+
+            if success {
+                // Delete war erfolgreich!
+                print("✅ Delete erfolgreich")
+
+                // 5. Ordner neu scannen (damit das gelöschte Bild verschwindet)
+                rescanFolder(folder)
+
+                // 6. Nächstes Bild auswählen
+                selectNextImageAfterDelete(deletedIndex: currentIndex)
+            } else {
+                // Delete ist fehlgeschlagen
+                print("❌ Delete fehlgeschlagen")
+            }
+        }
+    }
+
+    /// Wird aufgerufen, wenn der "CMD+Z"-Shortcut gedrückt wird
+    private func handleUndo() {
+        // 1. Gibt es überhaupt etwas zum Rückgängigmachen?
+        let canUndo: Bool = imageViewModel.canUndo()
+
+        if canUndo == false {
+            print("⚠️ Nichts zum Rückgängigmachen")
+            return
+        }
+
+        // 2. Gibt es einen ausgewählten Ordner?
+        guard let folder = folderURL else {
+            print("⚠️ Kein Ordner ausgewählt - kann nicht rückgängig machen")
+            return
+        }
+
+        print("🔄 Mache letzte Löschung rückgängig")
+
+        // 3. ViewModel aufrufen um das Undo auszuführen
+        imageViewModel.undoLastDelete { success in
+            // Callback wird aufgerufen wenn Undo fertig ist
+
+            if success {
+                // Undo war erfolgreich!
+                print("✅ Undo erfolgreich")
+
+                // 4. Ordner neu scannen (damit das wiederhergestellte Bild erscheint)
+                rescanFolder(folder)
+
+                // 5. Das wiederhergestellte Bild auswählen (ist jetzt das letzte in der Liste)
+                if pairs.isEmpty == false {
+                    selectedPair = pairs.last
+                }
+            } else {
+                // Undo ist fehlgeschlagen
+                print("❌ Undo fehlgeschlagen")
+            }
+        }
+    }
+
+    /// Wählt das nächste Bild nach einem Delete aus
+    /// - Parameter deletedIndex: Der Index des gelöschten Bildes (oder nil)
+    private func selectNextImageAfterDelete(deletedIndex: Int?) {
+        // Gibt es überhaupt noch Bilder?
+        if pairs.isEmpty {
+            // Keine Bilder mehr - nichts auswählen
+            selectedPair = nil
+            print("📭 Keine Bilder mehr im Ordner")
+            return
+        }
+
+        // Hatten wir einen Index?
+        guard let deletedIndex = deletedIndex else {
+            // Kein Index - einfach das erste Bild auswählen
+            selectedPair = pairs.first
+            return
+        }
+
+        // Jetzt müssen wir entscheiden: Nächstes oder vorheriges Bild?
+
+        // War das gelöschte Bild das letzte in der Liste?
+        if deletedIndex >= pairs.count {
+            // Ja - also das neue letzte Bild auswählen
+            selectedPair = pairs.last
+        } else {
+            // Nein - also das Bild an der gleichen Position auswählen
+            // (was vorher das nächste Bild war, ist jetzt an der gleichen Position)
+            selectedPair = pairs[deletedIndex]
+        }
+    }
+
 
     // MARK: - Navigation Handlers
 
