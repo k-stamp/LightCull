@@ -13,37 +13,17 @@ A fast and intuitive macOS application for viewing and culling photo pairs (JPEG
   - Mark favorites with the "TOP" Finder tag
   - Tags are applied to both JPEG and RAW files simultaneously
   - Keyboard shortcut (T) for quick tagging
+  - **Delete images**: Move unwanted photo pairs to a `_toDelete` folder with undo support
+  - Both JPEG and RAW files are deleted together
 - **EXIF Metadata Display**: View camera info, focal length, aperture, and shutter speed
 - **Thumbnail Navigation**: Quick browsing with a horizontal thumbnail strip
 - **Keyboard Shortcuts**:
   - `⌘+` / `⌘-`: Zoom in/out
   - `⌘0`: Reset zoom to 100%
   - `T`: Toggle TOP tag
+  - `D` (Delete): Move current image pair to _toDelete folder
+  - `⌘Z`: Undo delete operation
   - `← →`: Navigate between images
-
-## Requirements
-
-- macOS 13.0 (Ventura) or later
-- Xcode 14.0 or later (for building from source)
-
-## Installation
-
-### Building from Source
-
-1. Clone the repository:
-   ```bash
-   git clone https://github.com/yourusername/LightCull.git
-   cd LightCull
-   ```
-
-2. Open the project in Xcode:
-   ```bash
-   open LightCull.xcodeproj
-   ```
-
-3. Build and run:
-   - Press `⌘R` to build and run the application
-   - Or press `⌘B` to build only
 
 ## Usage
 
@@ -54,7 +34,10 @@ A fast and intuitive macOS application for viewing and culling photo pairs (JPEG
    - Pinch to zoom on trackpad
    - `⌘+` and `⌘-` keyboard shortcuts
    - Pan with two-finger drag when zoomed in
-4. **Tag Favorites**: Press `T` or click the tag button to mark images as "TOP"
+4. **Culling Workflow**:
+   - Press `T` or click the tag button to mark favorites as "TOP"
+   - Press `⌫` (Delete) to move unwanted images to the `_toDelete` folder
+   - Use `⌘Z` to undo accidental deletions
 5. **Review Metadata**: View EXIF information in the sidebar
 
 ## Architecture
