@@ -21,8 +21,9 @@ class ImageViewModel: ObservableObject {
     
     
     // MARK: - Dependencies
-    
+
     private let tagService: FinderTagService
+    private let deleteService: FileDeleteService
     
     
     // MARK: - Constants
@@ -37,10 +38,18 @@ class ImageViewModel: ObservableObject {
     let zoomStep: CGFloat = 0.25
     
     
+    // MARK: - Delete History (für Undo)
+
+    // Hier speichern wir alle Delete-Operationen für Undo
+    // Das ist ein einfaches Array - das neueste Element ist immer am Ende
+    private var deleteHistory: [DeleteOperation] = []
+
+
     // MARK: - Initializer
-    
-    init(tagService: FinderTagService = FinderTagService()) {
+
+    init(tagService: FinderTagService = FinderTagService(), deleteService: FileDeleteService = FileDeleteService()) {
         self.tagService = tagService
+        self.deleteService = deleteService
     }
     
     
@@ -215,23 +224,96 @@ class ImageViewModel: ObservableObject {
     }
     
     
+    // MARK: - Delete Actions
+
+    /// Verschiebt ein ImagePair in den _toDelete Ordner
+    /// - Parameters:
+    ///   - pair: Das ImagePair das gelöscht werden soll
+    ///   - folderURL: Der Ordner in dem die Bilder liegen
+    ///   - completion: Callback wenn die Operation fertig ist (true = Erfolg, false = Fehler)
+    func deleteImagePair(pair: ImagePair, in folderURL: URL, completion: @escaping (Bool) -> Void) {
+        // Delete-Service aufrufen um die Dateien zu verschieben
+        let operation: DeleteOperation? = deleteService.deletePair(pair, in: folderURL)
+
+        // Hat es funktioniert?
+        if let operation = operation {
+            // Ja! Operation zur History hinzufügen
+            deleteHistory.append(operation)
+            print("✅ ImagePair gelöscht - History enthält jetzt \(deleteHistory.count) Operationen")
+
+            // Callback mit Erfolg aufrufen
+            completion(true)
+        } else {
+            // Nein - Fehler!
+            print("❌ Fehler beim Löschen des ImagePairs")
+
+            // Callback mit Fehler aufrufen
+            completion(false)
+        }
+    }
+
+    /// Macht die letzte Delete-Operation rückgängig
+    /// - Parameter completion: Callback wenn die Operation fertig ist (true = Erfolg, false = Fehler)
+    func undoLastDelete(completion: @escaping (Bool) -> Void) {
+        // Gibt es überhaupt etwas zum Rückgängigmachen?
+        if deleteHistory.isEmpty {
+            print("⚠️ Keine Delete-Operationen zum Rückgängigmachen")
+            completion(false)
+            return
+        }
+
+        // Letzte Operation aus der History holen
+        // removeLast() holt das letzte Element UND entfernt es aus dem Array
+        let lastOperation: DeleteOperation = deleteHistory.removeLast()
+
+        print("🔄 Mache Delete rückgängig: \(lastOperation.originalJpegURL.lastPathComponent)")
+
+        // Delete-Service aufrufen um die Dateien zurück zu verschieben
+        let success: Bool = deleteService.undoDelete(lastOperation)
+
+        if success {
+            print("✅ Undo erfolgreich - History enthält jetzt \(deleteHistory.count) Operationen")
+            completion(true)
+        } else {
+            print("❌ Undo fehlgeschlagen")
+            // Bei Fehler die Operation WIEDER zur History hinzufügen
+            deleteHistory.append(lastOperation)
+            completion(false)
+        }
+    }
+
+    /// Prüft ob es Delete-Operationen gibt die rückgängig gemacht werden können
+    /// - Returns: true wenn Undo möglich ist, false wenn nicht
+    func canUndo() -> Bool {
+        // Einfach prüfen ob die History leer ist oder nicht
+        let hasHistory: Bool = deleteHistory.isEmpty == false
+        return hasHistory
+    }
+
+    /// Löscht die komplette Delete-History (z.B. bei Ordnerwechsel)
+    func clearDeleteHistory() {
+        deleteHistory.removeAll()
+        print("🗑️ Delete-History gelöscht")
+    }
+
+
     // MARK: - Computed Properties
-    
+
     /// Gibt den Zoom-Level als Prozentsatz zurück (für UI-Anzeige)
     var zoomPercentage: Int {
         Int(zoomScale * 100)
     }
-    
+
     /// Prüft ob maximaler Zoom erreicht ist
     var isMaxZoom: Bool {
         zoomScale >= maxZoom
     }
-    
+
     /// Prüft ob minimaler Zoom erreicht ist
     var isMinZoom: Bool {
         zoomScale <= minZoom
     }
-    
+
     /// Prüft ob Pan-Funktionalität verfügbar sein sollte
     var isPanEnabled: Bool {
         zoomScale > minZoom
