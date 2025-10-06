@@ -11,7 +11,13 @@ struct MainView: View {
     @State private var pairs: [ImagePair] = []
     @State private var folderURL: URL?
     @State private var selectedPair: ImagePair?
-    
+
+    // NEU: Multi-Selection für Batch-Operationen
+    @State private var selectedPairs: Set<UUID> = []
+
+    // NEU: State für Rename-Sheet
+    @State private var showRenameSheet: Bool = false
+
     // NEU: Tracking für Security-Scoped Access
     @State private var isAccessingSecurityScope = false
     
@@ -23,9 +29,12 @@ struct MainView: View {
     
     // NEU: Service zum Verwalten von Finder-Tags
     private let tagService = FinderTagService()
-    
+
     // Service zum Laden von Metadaten
     private let metadataService = MetadataService()
+
+    // NEU: Service zum Umbenennen von Dateien
+    private let renameService = FileRenameService()
     
     // Initialisierung für Tests und Previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
@@ -44,22 +53,34 @@ struct MainView: View {
             )
         } detail: {
             // CONTENT AREA: Bildvorschau oben + Thumbnails unten
-            VStack(spacing: 0) {
-                // WICHTIG: ViewModel wird hier weitergegeben!
-                ImageViewerView(
-                    selectedImagePair: selectedPair,
-                    viewModel: imageViewModel,
-                    onPreviousImage: selectPreviousImage,
-                    onNextImage: selectNextImage,
-                    onToggleTag: handleToggleTag  // NEU: Callback für Tag-Toggle
-                )
-                
-                ThumbnailBarView(
-                    pairs: pairs,
-                    selectedPair: $selectedPair
-                )
+            ZStack {
+                VStack(spacing: 0) {
+                    // WICHTIG: ViewModel wird hier weitergegeben!
+                    ImageViewerView(
+                        selectedImagePair: selectedPair,
+                        viewModel: imageViewModel,
+                        onPreviousImage: selectPreviousImage,
+                        onNextImage: selectNextImage,
+                        onToggleTag: handleToggleTag  // NEU: Callback für Tag-Toggle
+                    )
+
+                    ThumbnailBarView(
+                        pairs: pairs,
+                        selectedPair: $selectedPair,
+                        selectedPairs: $selectedPairs,
+                        onRenameSelected: handleRenameButtonClicked
+                    )
+                }
+                .background(Color(.controlBackgroundColor))
+
+                // NEU: Unsichtbare Buttons für Keyboard Shortcuts
+                VStack {
+                    Button("Rename Selected") { handleRenameButtonClicked() }
+                        .keyboardShortcut("n", modifiers: .command)
+                        .hidden()
+                }
+                .frame(width: 0, height: 0)
             }
-            .background(Color(.controlBackgroundColor))
             // Toolbar am oberen Fensterrand
             .toolbar {
                 // NEU: Tag-Button links in der Toolbar
@@ -81,10 +102,32 @@ struct MainView: View {
         .onDisappear {
             stopSecurityScopedAccess()
         }
+        // NEU: Rename-Sheet anzeigen
+        .sheet(isPresented: $showRenameSheet) {
+            renameSheetView
+        }
     }
     
+    // MARK: - Rename Sheet (NEU!)
+
+    /// Rename-Sheet für Batch-Umbenennung
+    private var renameSheetView: some View {
+        // Die ausgewählten Pairs aus dem Set holen
+        let selectedPairsArray: [ImagePair] = getSelectedPairsArray()
+
+        return RenameSheetView(
+            selectedPairs: selectedPairsArray,
+            onRename: { prefix in
+                handleRename(withPrefix: prefix)
+            },
+            onCancel: {
+                handleRenameCancel()
+            }
+        )
+    }
+
     // MARK: - Tag Button (NEU!)
-    
+
     /// Tag-Button für die Toolbar
     private var tagButtonView: some View {
         Button(action: {
@@ -193,6 +236,79 @@ struct MainView: View {
 
         // 4. Debug-Ausgabe
         print("✅ ImagePair aktualisiert: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
+    }
+
+    // MARK: - Rename Handlers (NEU!)
+
+    /// Wird aufgerufen, wenn der "Umbenennen"-Button geklickt wird
+    private func handleRenameButtonClicked() {
+        // Sheet anzeigen
+        showRenameSheet = true
+    }
+
+    /// Wird aufgerufen, wenn im Rename-Sheet auf "Abbrechen" geklickt wird
+    private func handleRenameCancel() {
+        // Sheet schließen
+        showRenameSheet = false
+
+        // Multi-Selection löschen
+        selectedPairs.removeAll()
+    }
+
+    /// Wird aufgerufen, wenn im Rename-Sheet auf "Umbenennen" geklickt wird
+    private func handleRename(withPrefix prefix: String) {
+        // 1. Die ausgewählten Pairs aus dem Set holen
+        let selectedPairsArray: [ImagePair] = getSelectedPairsArray()
+
+        // 2. Jedes Pair umbenennen
+        for pair in selectedPairsArray {
+            // Pair umbenennen mit dem Rename-Service
+            let newPair: ImagePair? = renameService.renamePair(pair, withPrefix: prefix)
+
+            if newPair == nil {
+                print("⚠️ Fehler beim Umbenennen von: \(pair.jpegURL.lastPathComponent)")
+            }
+        }
+
+        // 3. Sheet schließen
+        showRenameSheet = false
+
+        // 4. Multi-Selection löschen
+        selectedPairs.removeAll()
+
+        // 5. Ordner neu scannen (einfachste Lösung - lädt alle Pairs neu)
+        if let folder = folderURL {
+            rescanFolder(folder)
+        }
+    }
+
+    /// Gibt ein Array mit den ausgewählten ImagePairs zurück
+    private func getSelectedPairsArray() -> [ImagePair] {
+        // Leeres Array erstellen
+        var result: [ImagePair] = []
+
+        // Durch alle Pairs gehen
+        for pair in pairs {
+            // Ist dieses Pair im selectedPairs Set?
+            if selectedPairs.contains(pair.id) {
+                // Ja - zum Result-Array hinzufügen
+                result.append(pair)
+            }
+        }
+
+        return result
+    }
+
+    /// Scannt den Ordner neu und aktualisiert die Pairs
+    private func rescanFolder(_ folder: URL) {
+        // FileService nutzen um Pairs neu zu laden
+        let fileService = FileService(tagService: tagService)
+        pairs = fileService.findImagePairs(in: folder)
+
+        // Selected Pair zurücksetzen
+        selectedPair = nil
+
+        print("✅ Ordner neu gescannt - \(pairs.count) Pairs gefunden")
     }
 
     // MARK: - Navigation Handlers
