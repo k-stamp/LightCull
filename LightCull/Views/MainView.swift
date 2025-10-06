@@ -2,7 +2,7 @@
 //  MainView.swift
 //  LightCull
 //
-//  Hauptansicht der App - koordiniert die einzelnen UI-Komponenten
+//  Main view of the app - coordinates the individual UI components
 //
 
 import SwiftUI
@@ -12,31 +12,31 @@ struct MainView: View {
     @State private var folderURL: URL?
     @State private var selectedPair: ImagePair?
 
-    // NEU: Multi-Selection für Batch-Operationen
+    // NEW: Multi-selection for batch operations
     @State private var selectedPairs: Set<UUID> = []
 
-    // NEU: State für Rename-Sheet
+    // NEW: State for rename sheet
     @State private var showRenameSheet: Bool = false
 
-    // NEU: Tracking für Security-Scoped Access
+    // NEW: Tracking for security-scoped access
     @State private var isAccessingSecurityScope = false
-    
-    // Metadaten des aktuell ausgewählten Bildes
+
+    // Metadata of the currently selected image
     @State private var currentMetadata: ImageMetadata?
-    
-    // Shared ViewModel für Zoom-Kontrolle zwischen Viewer und Toolbar
+
+    // Shared ViewModel for zoom control between viewer and toolbar
     @StateObject private var imageViewModel = ImageViewModel()
-    
-    // NEU: Service zum Verwalten von Finder-Tags
+
+    // NEW: Service for managing Finder tags
     private let tagService = FinderTagService()
 
-    // Service zum Laden von Metadaten
+    // Service for loading metadata
     private let metadataService = MetadataService()
 
-    // NEU: Service zum Umbenennen von Dateien
+    // NEW: Service for renaming files
     private let renameService = FileRenameService()
-    
-    // Initialisierung für Tests und Previews
+
+    // Initialization for tests and previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
         _pairs = State(initialValue: pairs)
         _folderURL = State(initialValue: folderURL)
@@ -44,7 +44,7 @@ struct MainView: View {
     
     var body: some View {
         NavigationSplitView {
-            // SIDEBAR: Ordnerauswahl und Info
+            // SIDEBAR: Folder selection and info
             SidebarView(
                 folderURL: $folderURL,
                 pairs: $pairs,
@@ -52,17 +52,17 @@ struct MainView: View {
                 onFolderSelected: handleFolderSelection
             )
         } detail: {
-            // CONTENT AREA: Bildvorschau oben + Thumbnails unten
+            // CONTENT AREA: Image preview on top + thumbnails on bottom
             ZStack {
                 VStack(spacing: 0) {
-                    // WICHTIG: ViewModel wird hier weitergegeben!
+                    // IMPORTANT: ViewModel is passed through here!
                     ImageViewerView(
                         selectedImagePair: selectedPair,
                         viewModel: imageViewModel,
                         onPreviousImage: selectPreviousImage,
                         onNextImage: selectNextImage,
-                        onToggleTag: handleToggleTag,  // NEU: Callback für Tag-Toggle
-                        onDeleteImage: handleDelete  // NEU: Callback für Delete
+                        onToggleTag: handleToggleTag,  // NEW: Callback for tag toggle
+                        onDeleteImage: handleDelete  // NEW: Callback for delete
                     )
 
                     ThumbnailBarView(
@@ -74,7 +74,7 @@ struct MainView: View {
                 }
                 .background(Color(.controlBackgroundColor))
 
-                // NEU: Unsichtbare Buttons für Keyboard Shortcuts
+                // NEW: Invisible buttons for keyboard shortcuts
                 VStack {
                     Button("Rename Selected") { handleRenameButtonClicked() }
                         .keyboardShortcut("n", modifiers: .command)
@@ -86,43 +86,43 @@ struct MainView: View {
                 }
                 .frame(width: 0, height: 0)
             }
-            // Toolbar am oberen Fensterrand
+            // Toolbar at the top edge of the window
             .toolbar {
-                // NEU: Tag-Button links in der Toolbar
+                // NEW: Tag button on the left in the toolbar
                 ToolbarItem(placement: .navigation) {
                     tagButtonView
                 }
                 
                 ToolbarItem(placement: .primaryAction) {
-                    // Zoom-Controls rechts in der Toolbar
+                    // Zoom controls on the right in the toolbar
                     zoomControlsView
                 }
             }
         }
-        // Metadaten automatisch laden wenn sich das ausgewählte Bild ändert
+        // Automatically load metadata when the selected image changes
         .onChange(of: selectedPair) { oldValue, newValue in
                 loadMetadataForSelectedPair(newValue)
         }
-        // NEU: Cleanup bei View-Verschwinden
+        // NEW: Cleanup when view disappears
         .onDisappear {
             stopSecurityScopedAccess()
         }
-        // NEU: Delete-History löschen wenn Ordner wechselt
+        // NEW: Clear delete history when folder changes
         .onChange(of: folderURL) { oldValue, newValue in
-            // Bei Ordnerwechsel die Delete-History löschen
+            // Clear the delete history when folder changes
             imageViewModel.clearDeleteHistory()
         }
-        // NEU: Rename-Sheet anzeigen
+        // NEW: Show rename sheet
         .sheet(isPresented: $showRenameSheet) {
             renameSheetView
         }
     }
     
-    // MARK: - Rename Sheet (NEU!)
+    // MARK: - Rename Sheet (NEW!)
 
-    /// Rename-Sheet für Batch-Umbenennung
+    /// Rename sheet for batch renaming
     private var renameSheetView: some View {
-        // Die ausgewählten Pairs aus dem Set holen
+        // Get the selected pairs from the set
         let selectedPairsArray: [ImagePair] = getSelectedPairsArray()
 
         return RenameSheetView(
@@ -136,9 +136,9 @@ struct MainView: View {
         )
     }
 
-    // MARK: - Tag Button (NEU!)
+    // MARK: - Tag Button (NEW!)
 
-    /// Tag-Button für die Toolbar
+    /// Tag button for the toolbar
     private var tagButtonView: some View {
         Button(action: {
             handleToggleTag()
@@ -148,12 +148,12 @@ struct MainView: View {
                 .foregroundStyle(selectedPair?.hasTopTag == true ? .yellow : .primary)
         }
         .disabled(selectedPair == nil)
-        .help("Als TOP markieren/entfernen (T)")
+        .help("Mark/remove as TOP (T)")
     }
     
     // MARK: - Zoom Controls
     
-    /// Zoom-Slider und Buttons für die Toolbar
+    /// Zoom slider and buttons for the toolbar
     private var zoomControlsView: some View {
         HStack(spacing: 12) {
             // Zoom Out Button
@@ -164,11 +164,11 @@ struct MainView: View {
                     .imageScale(.medium)
             }
             .disabled(imageViewModel.isMinZoom)
-            .help("Herauszoomen (⌘-)")
+            .help("Zoom out (⌘-)")
             
-            // Zoom-Slider mit Prozentanzeige
+            // Zoom slider with percentage display
             HStack(spacing: 8) {
-                // KORREKTUR: Direktes Binding an @Published Property
+                // CORRECTION: Direct binding to @Published property
                 Slider(
                     value: $imageViewModel.zoomScale,
                     in: imageViewModel.minZoom...imageViewModel.maxZoom,
@@ -179,7 +179,7 @@ struct MainView: View {
                 
                 Text("\(imageViewModel.zoomPercentage)%")
                     .font(.caption)
-                    .monospacedDigit() // Verhindert Springen der Ziffern
+                    .monospacedDigit() // Prevents digit jumping
                     .frame(minWidth: 45, alignment: .trailing)
                     .foregroundStyle(selectedPair == nil ? .secondary : .primary)
             }
@@ -192,7 +192,7 @@ struct MainView: View {
                     .imageScale(.medium)
             }
             .disabled(imageViewModel.isMaxZoom)
-            .help("Hineinzoomen (⌘+)")
+            .help("Zoom in (⌘+)")
             
             // Reset Zoom Button
             Button(action: {
@@ -202,106 +202,106 @@ struct MainView: View {
                     .imageScale(.medium)
             }
             .disabled(imageViewModel.isMinZoom)
-            .help("Zoom zurücksetzen (⌘0)")
+            .help("Reset zoom (⌘0)")
         }
         .disabled(selectedPair == nil)
     }
     
     // MARK: - Event Handlers
     
-    /// Behandelt das Toggling des TOP-Tags für das aktuell ausgewählte Bild
+    /// Handles toggling of the TOP tag for the currently selected image
     private func handleToggleTag() {
         guard let currentPair = selectedPair else {
             return
         }
 
-        // ViewModel aufrufen um Tag zu togglen
+        // Call ViewModel to toggle tag
         imageViewModel.toggleTopTag(for: currentPair) { updatedPair in
-            // WICHTIG: UI-Updates MÜSSEN auf dem Main Thread passieren
+            // IMPORTANT: UI updates MUST happen on the main thread
             DispatchQueue.main.async {
-                // Callback: ImagePair im Array aktualisieren
+                // Callback: Update ImagePair in the array
                 updateImagePair(updatedPair)
             }
         }
     }
     
-    /// Aktualisiert ein ImagePair im pairs-Array
-    /// - Parameter updatedPair: Das aktualisierte ImagePair mit neuem Tag-Status
+    /// Updates an ImagePair in the pairs array
+    /// - Parameter updatedPair: The updated ImagePair with new tag status
     private func updateImagePair(_ updatedPair: ImagePair) {
-        // 1. Index des alten Pairs finden
-        // Wir nutzen Equatable (basierend auf URLs), nicht auf hasTopTag!
+        // 1. Find the index of the old pair
+        // We use Equatable (based on URLs), not on hasTopTag!
         guard let index = pairs.firstIndex(where: { $0 == updatedPair }) else {
-            print("⚠️ ImagePair nicht im Array gefunden")
+            print("⚠️ ImagePair not found in array")
             return
         }
 
-        // 2. Altes Pair durch neues ersetzen
+        // 2. Replace old pair with new one
         pairs[index] = updatedPair
 
-        // 3. Auch selectedPair aktualisieren (damit UI synchron bleibt)
-        // WICHTIG: Wir setzen selectedPair auf nil und dann auf updatedPair
-        // Das zwingt SwiftUI, die Änderung zu erkennen und die UI zu aktualisieren
+        // 3. Also update selectedPair (to keep UI in sync)
+        // IMPORTANT: We set selectedPair to nil and then to updatedPair
+        // This forces SwiftUI to detect the change and update the UI
         selectedPair = nil
         selectedPair = updatedPair
 
-        // 4. Debug-Ausgabe
-        print("✅ ImagePair aktualisiert: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
+        // 4. Debug output
+        print("✅ ImagePair updated: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
     }
 
-    // MARK: - Rename Handlers (NEU!)
+    // MARK: - Rename Handlers (NEW!)
 
-    /// Wird aufgerufen, wenn der "Umbenennen"-Button geklickt wird
+    /// Called when the "Rename" button is clicked
     private func handleRenameButtonClicked() {
-        // Sheet anzeigen
+        // Show sheet
         showRenameSheet = true
     }
 
-    /// Wird aufgerufen, wenn im Rename-Sheet auf "Abbrechen" geklickt wird
+    /// Called when "Cancel" is clicked in the rename sheet
     private func handleRenameCancel() {
-        // Sheet schließen
+        // Close sheet
         showRenameSheet = false
 
-        // Multi-Selection löschen
+        // Clear multi-selection
         selectedPairs.removeAll()
     }
 
-    /// Wird aufgerufen, wenn im Rename-Sheet auf "Umbenennen" geklickt wird
+    /// Called when "Rename" is clicked in the rename sheet
     private func handleRename(withPrefix prefix: String) {
-        // 1. Die ausgewählten Pairs aus dem Set holen
+        // 1. Get the selected pairs from the set
         let selectedPairsArray: [ImagePair] = getSelectedPairsArray()
 
-        // 2. Jedes Pair umbenennen
+        // 2. Rename each pair
         for pair in selectedPairsArray {
-            // Pair umbenennen mit dem Rename-Service
+            // Rename pair using the rename service
             let newPair: ImagePair? = renameService.renamePair(pair, withPrefix: prefix)
 
             if newPair == nil {
-                print("⚠️ Fehler beim Umbenennen von: \(pair.jpegURL.lastPathComponent)")
+                print("⚠️ Error renaming: \(pair.jpegURL.lastPathComponent)")
             }
         }
 
-        // 3. Sheet schließen
+        // 3. Close sheet
         showRenameSheet = false
 
-        // 4. Multi-Selection löschen
+        // 4. Clear multi-selection
         selectedPairs.removeAll()
 
-        // 5. Ordner neu scannen (einfachste Lösung - lädt alle Pairs neu)
+        // 5. Rescan folder (simplest solution - reloads all pairs)
         if let folder = folderURL {
             rescanFolder(folder)
         }
     }
 
-    /// Gibt ein Array mit den ausgewählten ImagePairs zurück
+    /// Returns an array with the selected ImagePairs
     private func getSelectedPairsArray() -> [ImagePair] {
-        // Leeres Array erstellen
+        // Create empty array
         var result: [ImagePair] = []
 
-        // Durch alle Pairs gehen
+        // Go through all pairs
         for pair in pairs {
-            // Ist dieses Pair im selectedPairs Set?
+            // Is this pair in the selectedPairs set?
             if selectedPairs.contains(pair.id) {
-                // Ja - zum Result-Array hinzufügen
+                // Yes - add to result array
                 result.append(pair)
             }
         }
@@ -309,126 +309,126 @@ struct MainView: View {
         return result
     }
 
-    /// Scannt den Ordner neu und aktualisiert die Pairs
+    /// Rescans the folder and updates the pairs
     private func rescanFolder(_ folder: URL) {
-        // FileService nutzen um Pairs neu zu laden
+        // Use FileService to reload pairs
         let fileService = FileService(tagService: tagService)
         pairs = fileService.findImagePairs(in: folder)
 
-        // Selected Pair zurücksetzen
+        // Reset selected pair
         selectedPair = nil
 
-        print("✅ Ordner neu gescannt - \(pairs.count) Pairs gefunden")
+        print("✅ Folder rescanned - \(pairs.count) pairs found")
     }
 
-    // MARK: - Delete Handlers (NEU!)
+    // MARK: - Delete Handlers (NEW!)
 
-    /// Wird aufgerufen, wenn der "D"-Shortcut gedrückt wird
+    /// Called when the "D" shortcut is pressed
     private func handleDelete() {
-        // 1. Gibt es überhaupt ein ausgewähltes Bild?
+        // 1. Is there even a selected image?
         guard let currentPair = selectedPair else {
-            print("⚠️ Kein Bild ausgewählt - kann nicht löschen")
+            print("⚠️ No image selected - cannot delete")
             return
         }
 
-        // 2. Gibt es einen ausgewählten Ordner?
+        // 2. Is there a selected folder?
         guard let folder = folderURL else {
-            print("⚠️ Kein Ordner ausgewählt - kann nicht löschen")
+            print("⚠️ No folder selected - cannot delete")
             return
         }
 
-        // 3. Index des aktuellen Bildes merken (für Navigation nach Delete)
+        // 3. Remember the index of the current image (for navigation after delete)
         let currentIndex: Int? = pairs.firstIndex(of: currentPair)
 
-        print("🗑️ Lösche Bild: \(currentPair.jpegURL.lastPathComponent)")
+        print("🗑️ Deleting image: \(currentPair.jpegURL.lastPathComponent)")
 
-        // 4. ViewModel aufrufen um das Bild zu löschen
+        // 4. Call ViewModel to delete the image
         imageViewModel.deleteImagePair(pair: currentPair, in: folder) { success in
-            // Callback wird aufgerufen wenn Delete fertig ist
+            // Callback is called when delete is finished
 
             if success {
-                // Delete war erfolgreich!
-                print("✅ Delete erfolgreich")
+                // Delete was successful!
+                print("✅ Delete successful")
 
-                // 5. Ordner neu scannen (damit das gelöschte Bild verschwindet)
+                // 5. Rescan folder (so the deleted image disappears)
                 rescanFolder(folder)
 
-                // 6. Nächstes Bild auswählen
+                // 6. Select next image
                 selectNextImageAfterDelete(deletedIndex: currentIndex)
             } else {
-                // Delete ist fehlgeschlagen
-                print("❌ Delete fehlgeschlagen")
+                // Delete failed
+                print("❌ Delete failed")
             }
         }
     }
 
-    /// Wird aufgerufen, wenn der "CMD+Z"-Shortcut gedrückt wird
+    /// Called when the "CMD+Z" shortcut is pressed
     private func handleUndo() {
-        // 1. Gibt es überhaupt etwas zum Rückgängigmachen?
+        // 1. Is there even anything to undo?
         let canUndo: Bool = imageViewModel.canUndo()
 
         if canUndo == false {
-            print("⚠️ Nichts zum Rückgängigmachen")
+            print("⚠️ Nothing to undo")
             return
         }
 
-        // 2. Gibt es einen ausgewählten Ordner?
+        // 2. Is there a selected folder?
         guard let folder = folderURL else {
-            print("⚠️ Kein Ordner ausgewählt - kann nicht rückgängig machen")
+            print("⚠️ No folder selected - cannot undo")
             return
         }
 
-        print("🔄 Mache letzte Löschung rückgängig")
+        print("🔄 Undoing last deletion")
 
-        // 3. ViewModel aufrufen um das Undo auszuführen
+        // 3. Call ViewModel to execute the undo
         imageViewModel.undoLastDelete { success in
-            // Callback wird aufgerufen wenn Undo fertig ist
+            // Callback is called when undo is finished
 
             if success {
-                // Undo war erfolgreich!
-                print("✅ Undo erfolgreich")
+                // Undo was successful!
+                print("✅ Undo successful")
 
-                // 4. Ordner neu scannen (damit das wiederhergestellte Bild erscheint)
+                // 4. Rescan folder (so the restored image appears)
                 rescanFolder(folder)
 
-                // 5. Das wiederhergestellte Bild auswählen (ist jetzt das letzte in der Liste)
+                // 5. Select the restored image (it's now the last in the list)
                 if pairs.isEmpty == false {
                     selectedPair = pairs.last
                 }
             } else {
-                // Undo ist fehlgeschlagen
-                print("❌ Undo fehlgeschlagen")
+                // Undo failed
+                print("❌ Undo failed")
             }
         }
     }
 
-    /// Wählt das nächste Bild nach einem Delete aus
-    /// - Parameter deletedIndex: Der Index des gelöschten Bildes (oder nil)
+    /// Selects the next image after a delete
+    /// - Parameter deletedIndex: The index of the deleted image (or nil)
     private func selectNextImageAfterDelete(deletedIndex: Int?) {
-        // Gibt es überhaupt noch Bilder?
+        // Are there even any images left?
         if pairs.isEmpty {
-            // Keine Bilder mehr - nichts auswählen
+            // No more images - select nothing
             selectedPair = nil
-            print("📭 Keine Bilder mehr im Ordner")
+            print("📭 No more images in folder")
             return
         }
 
-        // Hatten wir einen Index?
+        // Did we have an index?
         guard let deletedIndex = deletedIndex else {
-            // Kein Index - einfach das erste Bild auswählen
+            // No index - just select the first image
             selectedPair = pairs.first
             return
         }
 
-        // Jetzt müssen wir entscheiden: Nächstes oder vorheriges Bild?
+        // Now we need to decide: Next or previous image?
 
-        // War das gelöschte Bild das letzte in der Liste?
+        // Was the deleted image the last in the list?
         if deletedIndex >= pairs.count {
-            // Ja - also das neue letzte Bild auswählen
+            // Yes - so select the new last image
             selectedPair = pairs.last
         } else {
-            // Nein - also das Bild an der gleichen Position auswählen
-            // (was vorher das nächste Bild war, ist jetzt an der gleichen Position)
+            // No - so select the image at the same position
+            // (what was previously the next image is now at the same position)
             selectedPair = pairs[deletedIndex]
         }
     }
@@ -436,25 +436,25 @@ struct MainView: View {
 
     // MARK: - Navigation Handlers
 
-    /// Wird aufgerufen, wenn ein neuer Ordner ausgewählt wird
+    /// Called when a new folder is selected
     private func handleFolderSelection(_ url: URL) {
-        // WICHTIG: Erst alten Access stoppen
+        // IMPORTANT: First stop old access
         stopSecurityScopedAccess()
-        
-        // NEU: Security-Scoped Access für den ausgewählten Ordner starten
+
+        // NEW: Start security-scoped access for the selected folder
         isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
         
         if !isAccessingSecurityScope {
-            print("⚠️ Konnte Security-Scoped Access nicht starten für: \(url.path)")
+            print("⚠️ Could not start security-scoped access for: \(url.path)")
         } else {
-            print("✅ Security-Scoped Access gestartet für: \(url.path)")
+            print("✅ Security-scoped access started for: \(url.path)")
         }
         
-        // Erstes Bild auswählen
+        // Select first image
         selectedPair = pairs.first
     }
     
-    /// Stoppt den Security-Scoped Access für den aktuellen Ordner
+    /// Stops security-scoped access for the current folder
     private func stopSecurityScopedAccess() {
         guard isAccessingSecurityScope, let url = folderURL else {
             return
@@ -462,10 +462,10 @@ struct MainView: View {
         
         url.stopAccessingSecurityScopedResource()
         isAccessingSecurityScope = false
-        print("🛑 Security-Scoped Access gestoppt für: \(url.path)")
+        print("🛑 Security-scoped access stopped for: \(url.path)")
     }
 
-    /// Springt zum vorherigen Bild in der Liste
+    /// Jumps to the previous image in the list
     private func selectPreviousImage() {
         guard let current = selectedPair,
               let currentIndex = pairs.firstIndex(of: current),
@@ -475,7 +475,7 @@ struct MainView: View {
         selectedPair = pairs[currentIndex - 1]
     }
 
-    /// Springt zum nächsten Bild in der Liste
+    /// Jumps to the next image in the list
     private func selectNextImage() {
         guard let current = selectedPair,
               let currentIndex = pairs.firstIndex(of: current),
@@ -488,7 +488,7 @@ struct MainView: View {
     // MARK: - Metadata Loading
     
     private func loadMetadataForSelectedPair(_ pair: ImagePair?) {
-        // Wenn kein Bild ausgewählt ist, Metadaten zurücksetzen
+        // If no image is selected, reset metadata
         guard let pair = pair else {
             currentMetadata = nil
             return
@@ -496,11 +496,11 @@ struct MainView: View {
         
         currentMetadata = metadataService.extractMetadata(from: pair.jpegURL)
         
-        // Debug-Output (kannst du später entfernen)
+        // Debug output (you can remove this later)
         if let metadata = currentMetadata {
-            print("Metadaten geladen: \(metadata.fileName)")
+            print("Metadata loaded: \(metadata.fileName)")
         } else {
-            print("Keine Metadaten verfügbar für: \(pair.jpegURL.lastPathComponent)")
+            print("No metadata available for: \(pair.jpegURL.lastPathComponent)")
         }
     }
     

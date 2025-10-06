@@ -2,28 +2,28 @@
 //  DeleteOperation.swift
 //  LightCull
 //
-//  Speichert Informationen über eine Lösch-Operation für Undo-Funktionalität
+//  Stores information about a delete operation for undo functionality
 //
 
 import Foundation
 
-// Dieses Struct speichert alle Informationen, die wir brauchen, um eine Löschung
-// rückgängig zu machen. Es ist wie eine "Erinnerung" an die Verschiebung.
+// This struct stores all the information we need to undo a deletion.
+// It's like a "memory" of the move operation.
 struct DeleteOperation {
-    // Die originale URL des JPEG (bevor es verschoben wurde)
+    // The original URL of the JPEG (before it was moved)
     let originalJpegURL: URL
 
-    // Die neue URL des JPEG (im _toDelete Ordner)
+    // The new URL of the JPEG (in the _toDelete folder)
     let deletedJpegURL: URL
 
-    // Die originale URL des RAW (bevor es verschoben wurde)
-    // Optional, weil nicht jedes Bild ein RAW hat
+    // The original URL of the RAW (before it was moved)
+    // Optional, because not every image has a RAW
     let originalRawURL: URL?
 
-    // Die neue URL des RAW (im _toDelete Ordner)
-    // Optional, weil nicht jedes Bild ein RAW hat
+    // The new URL of the RAW (in the _toDelete folder)
+    // Optional, because not every image has a RAW
     let deletedRawURL: URL?
 
-    // Wann wurde das Bild gelöscht? (für Debug-Zwecke)
+    // When was the image deleted? (for debugging purposes)
     let timestamp: Date
 }

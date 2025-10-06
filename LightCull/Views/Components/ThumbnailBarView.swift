@@ -2,23 +2,23 @@
 //  ThumbnailBarView.swift
 //  LightCull
 //
-//  Verantwortlich für: Thumbnail-Leiste mit Navigation
+//  Responsible for: Thumbnail bar with navigation
 //
 
 import SwiftUI
-import AppKit  // Für NSEvent.modifierFlags (CMD-Taste Detection)
+import AppKit  // For NSEvent.modifierFlags (CMD key detection)
 
 struct ThumbnailBarView: View {
     let pairs: [ImagePair]
     @Binding var selectedPair: ImagePair?
 
-    // NEU: Multi-Selection für Batch-Operationen
+    // NEW: Multi-selection for batch operations
     @Binding var selectedPairs: Set<UUID>
 
-    // NEU: Callback für Context-Menu "Umbenennen"
+    // NEW: Callback for context menu "Rename"
     let onRenameSelected: () -> Void
 
-    // NEU: State für letzten Click (für Shift-Selection)
+    // NEW: State for last click (for shift-selection)
     @State private var lastClickedPairID: UUID? = nil
 
     var body: some View {
@@ -29,7 +29,7 @@ struct ThumbnailBarView: View {
                 thumbnailContentView
             }
         }
-        .frame(height: 150) // Feste Höhe für Thumbnail-Bereich
+        .frame(height: 150) // Fixed height for thumbnail area
         .frame(maxWidth: .infinity)
         .background(Color(.controlBackgroundColor))
     }
@@ -109,7 +109,7 @@ struct ThumbnailBarView: View {
             .frame(maxWidth: 100, maxHeight: 100)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay {
-                // Border-Logik: Blau wenn multi-selected, Accent wenn single-selected
+                // Border logic: Blue when multi-selected, accent when single-selected
                 RoundedRectangle(cornerRadius: 6)
                     .stroke(
                         getBorderColor(for: pair),
@@ -117,61 +117,61 @@ struct ThumbnailBarView: View {
                     )
             }
 
-            // Dateiname ohne Extension
+            // Filename without extension
             Text(pair.jpegURL.deletingPathExtension().lastPathComponent)
                 .font(.caption2)
                 .lineLimit(1)
                 .frame(maxWidth: 100)
 
-            // RAW Status
+            // RAW status
             Text(pair.rawURL != nil ? "RAW✅" : "RAW🚫")
                 .font(.caption2)
         }
         .frame(maxWidth: 110)
-        // NEU: Context-Menu für Umbenennen
+        // NEW: Context menu for renaming
         .contextMenu {
             contextMenuItems(for: pair)
         }
     }
 
-    // MARK: - Border Logik
+    // MARK: - Border Logic
 
-    /// Gibt die Border-Farbe für ein Thumbnail zurück
-    /// Blau = Multi-Selection, Accent = Single-Selection, Grau = Nicht ausgewählt
+    /// Returns the border color for a thumbnail
+    /// Blue = multi-selection, accent = single-selection, gray = not selected
     private func getBorderColor(for pair: ImagePair) -> Color {
-        // Ist dieses Pair in der Multi-Selection?
+        // Is this pair in the multi-selection?
         let isMultiSelected: Bool = selectedPairs.contains(pair.id)
 
         if isMultiSelected {
-            // Multi-Selection: Blauer Rand
+            // Multi-selection: blue border
             return Color.blue
         } else if selectedPair?.id == pair.id {
-            // Single-Selection: Accent-Farbe
+            // Single-selection: accent color
             return Color.accentColor
         } else {
-            // Nicht ausgewählt: Grauer Separator
+            // Not selected: gray separator
             return Color(.separatorColor)
         }
     }
 
-    /// Gibt die Border-Breite für ein Thumbnail zurück
+    /// Returns the border width for a thumbnail
     private func getBorderWidth(for pair: ImagePair) -> CGFloat {
-        // Ist dieses Pair ausgewählt (entweder single oder multi)?
+        // Is this pair selected (either single or multi)?
         let isMultiSelected: Bool = selectedPairs.contains(pair.id)
         let isSingleSelected: Bool = selectedPair?.id == pair.id
 
         if isMultiSelected || isSingleSelected {
-            // Ausgewählt: Dickerer Rand
+            // Selected: thicker border
             return 2.0
         } else {
-            // Nicht ausgewählt: Dünner Rand
+            // Not selected: thin border
             return 0.5
         }
     }
 
     // MARK: - Context Menu
 
-    /// Gibt die Context-Menu-Items für ein Thumbnail zurück
+    /// Returns the context menu items for a thumbnail
     private func contextMenuItems(for pair: ImagePair) -> some View {
         Group {
             Button("Umbenennen...") {
@@ -182,109 +182,109 @@ struct ThumbnailBarView: View {
 
     // MARK: - Actions
 
-    /// Wird aufgerufen, wenn auf ein Thumbnail geklickt wird
+    /// Called when a thumbnail is clicked
     private func handleThumbnailClick(for pair: ImagePair) {
-        // Prüfen welche Modifier-Keys gedrückt sind
-        // NSEvent.modifierFlags ist ein macOS-Feature, um aktuell gedrückte Tasten zu prüfen
+        // Check which modifier keys are pressed
+        // NSEvent.modifierFlags is a macOS feature to check currently pressed keys
         let isCmdPressed: Bool = NSEvent.modifierFlags.contains(.command)
         let isShiftPressed: Bool = NSEvent.modifierFlags.contains(.shift)
 
         if isShiftPressed {
-            // SHIFT ist gedrückt: Range-Selection (wie im Finder)
+            // SHIFT is pressed: range selection (like in Finder)
             handleRangeSelection(to: pair)
         } else if isCmdPressed {
-            // CMD ist gedrückt: Multi-Selection Toggle
+            // CMD is pressed: multi-selection toggle
             handleMultiSelectionToggle(for: pair)
         } else {
-            // Keine Modifier: Normale Single-Selection
+            // No modifier: normal single-selection
             handleSingleSelection(for: pair)
         }
 
-        // Letzten Click speichern (für Shift-Selection)
+        // Save last click (for shift-selection)
         lastClickedPairID = pair.id
     }
 
-    /// Behandelt normale Single-Selection (ohne Modifier)
+    /// Handles normal single-selection (without modifier)
     private func handleSingleSelection(for pair: ImagePair) {
-        // Single-Selection setzen
+        // Set single-selection
         selectedPair = pair
 
-        // Multi-Selection löschen
+        // Clear multi-selection
         selectedPairs.removeAll()
     }
 
-    /// Behandelt Multi-Selection Toggle (mit CMD)
+    /// Handles multi-selection toggle (with CMD)
     private func handleMultiSelectionToggle(for pair: ImagePair) {
-        // WICHTIG: Beim ersten CMD+Click müssen wir die aktuelle Single-Selection
-        // zur Multi-Selection hinzufügen, sonst geht sie verloren!
+        // IMPORTANT: On first CMD+click, we must add the current single-selection
+        // to the multi-selection, otherwise it gets lost!
         if selectedPairs.isEmpty && selectedPair != nil {
-            // Multi-Selection ist leer, aber Single-Selection existiert
-            // -> Single-Selection zur Multi-Selection hinzufügen
+            // Multi-selection is empty, but single-selection exists
+            // -> Add single-selection to multi-selection
             selectedPairs.insert(selectedPair!.id)
         }
 
-        // Ist dieses Pair bereits in der Multi-Selection?
+        // Is this pair already in the multi-selection?
         let isAlreadySelected: Bool = selectedPairs.contains(pair.id)
 
         if isAlreadySelected {
-            // Ja - entfernen (Toggle off)
+            // Yes - remove (toggle off)
             selectedPairs.remove(pair.id)
         } else {
-            // Nein - hinzufügen (Toggle on)
+            // No - add (toggle on)
             selectedPairs.insert(pair.id)
         }
 
-        // Single-Selection löschen (Multi-Selection ist jetzt aktiv)
+        // Clear single-selection (multi-selection is now active)
         selectedPair = nil
 
-        // Wenn Multi-Selection jetzt leer ist, setzen wir Single-Selection zurück
+        // If multi-selection is now empty, reset single-selection
         if selectedPairs.isEmpty {
             selectedPair = pair
         }
     }
 
-    /// Behandelt Range-Selection (mit SHIFT)
+    /// Handles range selection (with SHIFT)
     private func handleRangeSelection(to targetPair: ImagePair) {
-        // Wenn kein letzter Click gespeichert ist, behandeln wie normale Selection
+        // If no last click is saved, treat as normal selection
         guard let lastID = lastClickedPairID else {
             handleSingleSelection(for: targetPair)
             return
         }
 
-        // Finde die Indizes vom letzten Click und vom aktuellen Click
+        // Find the indices from last click and current click
         guard let startIndex = pairs.firstIndex(where: { $0.id == lastID }),
               let endIndex = pairs.firstIndex(where: { $0.id == targetPair.id }) else {
-            // Einer der Indizes nicht gefunden - normale Selection
+            // One of the indices not found - normal selection
             handleSingleSelection(for: targetPair)
             return
         }
 
-        // Bestimme den Range (von klein nach groß)
+        // Determine the range (from small to large)
         let rangeStart: Int = min(startIndex, endIndex)
         let rangeEnd: Int = max(startIndex, endIndex)
 
-        // Multi-Selection löschen
+        // Clear multi-selection
         selectedPairs.removeAll()
 
-        // Alle Pairs im Range zur Multi-Selection hinzufügen
+        // Add all pairs in range to multi-selection
         for i in rangeStart...rangeEnd {
             let pair: ImagePair = pairs[i]
             selectedPairs.insert(pair.id)
         }
 
-        // Single-Selection löschen (Multi-Selection ist aktiv)
+        // Clear single-selection (multi-selection is active)
         selectedPair = nil
     }
 
-    /// Wird aufgerufen, wenn "Umbenennen..." im Context-Menu geklickt wird
+    /// Called when "Rename..." is clicked in the context menu
     private func handleRenameFromContextMenu(for pair: ImagePair) {
-        // Sicherstellen, dass dieses Pair in der Multi-Selection ist
+        // Ensure this pair is in the multi-selection
         if !selectedPairs.contains(pair.id) {
-            // Falls nicht, fügen wir es hinzu
+            // If not, add it
             selectedPairs.insert(pair.id)
         }
 
-        // Callback aufrufen
+        // Call callback
         onRenameSelected()
     }
 }

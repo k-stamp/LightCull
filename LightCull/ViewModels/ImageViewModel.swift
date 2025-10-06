@@ -2,21 +2,21 @@
 //  ImageViewModel.swift
 //  LightCull
 //
-//  Verantwortlich für: State-Management der Bildanzeige (Zoom, Position, etc.)
+//  Responsible for: State management of image display (zoom, position, etc.)
 //
 
 import SwiftUI
 import Combine
 
-/// ViewModel für die Bildanzeige mit Zoom-Funktionalität
+/// ViewModel for image display with zoom functionality
 class ImageViewModel: ObservableObject {
     
     // MARK: - Published Properties
     
-    /// Aktueller Zoom-Level (1.0 = 100%, 4.0 = 400%)
+    /// Current zoom level (1.0 = 100%, 4.0 = 400%)
     @Published var zoomScale: CGFloat = 1.0
-    
-    /// Position des Bildes beim Zoomen (für Pan-Gesten)
+
+    /// Position of the image when zooming (for pan gestures)
     @Published var imageOffset: CGSize = .zero
     
     
@@ -28,20 +28,20 @@ class ImageViewModel: ObservableObject {
     
     // MARK: - Constants
     
-    /// Minimaler Zoom-Level (100% = Fensteranpassung)
+    /// Minimum zoom level (100% = fit to window)
     let minZoom: CGFloat = 1.0
-    
-    /// Maximaler Zoom-Level (400% laut Dokumentation)
+
+    /// Maximum zoom level (400% according to documentation)
     let maxZoom: CGFloat = 4.0
-    
-    /// Zoom-Schritte für Tastatur-Shortcuts (25%)
+
+    /// Zoom steps for keyboard shortcuts (25%)
     let zoomStep: CGFloat = 0.25
     
     
-    // MARK: - Delete History (für Undo)
+    // MARK: - Delete History (for Undo)
 
-    // Hier speichern wir alle Delete-Operationen für Undo
-    // Das ist ein einfaches Array - das neueste Element ist immer am Ende
+    // Here we store all delete operations for undo
+    // This is a simple array - the newest element is always at the end
     private var deleteHistory: [DeleteOperation] = []
 
 
@@ -55,7 +55,7 @@ class ImageViewModel: ObservableObject {
     
     // MARK: - Zoom Actions
     
-    /// Erhöht den Zoom-Level um einen Schritt
+    /// Increases the zoom level by one step
     func zoomIn() {
         let newScale = min(zoomScale + zoomStep, maxZoom)
         withAnimation(.easeInOut(duration: 0.2)) {
@@ -63,19 +63,19 @@ class ImageViewModel: ObservableObject {
         }
     }
     
-    /// Verringert den Zoom-Level um einen Schritt
+    /// Decreases the zoom level by one step
     func zoomOut() {
         let newScale = max(zoomScale - zoomStep, minZoom)
         withAnimation(.easeInOut(duration: 0.2)) {
             zoomScale = newScale
-            // Wenn zurück auf 100%, Offset zurücksetzen
+            // If back to 100%, reset offset
             if newScale == minZoom {
                 imageOffset = .zero
             }
         }
     }
     
-    /// Setzt den Zoom auf 100% (Fensteranpassung) zurück
+    /// Resets zoom to 100% (fit to window)
     func resetZoom() {
         withAnimation(.easeInOut(duration: 0.2)) {
             zoomScale = minZoom
@@ -83,31 +83,31 @@ class ImageViewModel: ObservableObject {
         }
     }
     
-    /// Setzt den Zoom auf einen spezifischen Wert (z.B. vom Slider)
+    /// Sets zoom to a specific value (e.g. from slider)
     func setZoom(to scale: CGFloat) {
-        // Sicherstellen dass der Wert im erlaubten Bereich liegt
+        // Ensure the value is within the allowed range
         let clampedScale = min(max(scale, minZoom), maxZoom)
         zoomScale = clampedScale
-        
-        // Wenn zurück auf 100%, Offset zurücksetzen
+
+        // If back to 100%, reset offset
         if clampedScale == minZoom {
             imageOffset = .zero
         }
     }
     
-    /// Behandelt Magnification-Gesten vom Trackpad
-    /// - Parameter magnification: Die Änderung der Vergrößerung
+    /// Handles magnification gestures from trackpad
+    /// - Parameter magnification: The change in magnification
     func handleMagnification(_ magnification: CGFloat) {
-        // Neue Skala berechnen basierend auf aktueller Skala
+        // Calculate new scale based on current scale
         let newScale = zoomScale * magnification
-        
-        // Im erlaubten Bereich halten
+
+        // Keep within allowed range
         let clampedScale = min(max(newScale, minZoom), maxZoom)
-        
-        // Ohne Animation für flüssige Gesten
+
+        // Without animation for smooth gestures
         zoomScale = clampedScale
-        
-        // Wenn zurück auf 100%, Offset zurücksetzen
+
+        // If back to 100%, reset offset
         if clampedScale == minZoom {
             imageOffset = .zero
         }
@@ -115,51 +115,51 @@ class ImageViewModel: ObservableObject {
     
     // MARK: - Pan Actions
     
-    /// Behandelt Drag-Gesten zum Verschieben des gezoomten Bildes
+    /// Handles drag gestures to move the zoomed image
     /// - Parameters:
-    ///   - translation: Die Verschiebung in Pixeln
-    ///   - imageSize: Die Größe des Bildes (für Grenzen-Berechnung)
-    ///   - viewSize: Die Größe des View-Bereichs
+    ///   - translation: The translation in pixels
+    ///   - imageSize: The size of the image (for boundary calculation)
+    ///   - viewSize: The size of the view area
     func handleDrag(translation: CGSize, imageSize: CGSize, viewSize: CGSize) {
-        // Pan nur erlauben wenn gezoomt
+        // Only allow pan when zoomed
         guard zoomScale > minZoom else {
             imageOffset = .zero
             return
         }
-        
-        // Berechne die Grenzen basierend auf Zoom-Level
-        // Das Bild skaliert, also müssen wir die skalierten Dimensionen berücksichtigen
+
+        // Calculate boundaries based on zoom level
+        // The image scales, so we must consider the scaled dimensions
         let scaledImageWidth = imageSize.width * zoomScale
         let scaledImageHeight = imageSize.height * zoomScale
-        
-        // Maximale Verschiebung in beide Richtungen
-        // (Halbe Differenz zwischen skaliertem Bild und View)
+
+        // Maximum translation in both directions
+        // (Half the difference between scaled image and view)
         let maxOffsetX = max(0, (scaledImageWidth - viewSize.width) / 2)
         let maxOffsetY = max(0, (scaledImageHeight - viewSize.height) / 2)
-        
-        // Begrenze den Offset auf die berechneten Maximalwerte
+
+        // Limit the offset to the calculated maximum values
         let clampedX = min(max(translation.width, -maxOffsetX), maxOffsetX)
         let clampedY = min(max(translation.height, -maxOffsetY), maxOffsetY)
-        
+
         imageOffset = CGSize(width: clampedX, height: clampedY)
     }
     
-    /// Wird aufgerufen wenn eine Drag-Geste endet
-    /// Kann für Schwung-Effekte oder Snap-Verhalten genutzt werden
+    /// Called when a drag gesture ends
+    /// Can be used for momentum effects or snap behavior
     func endDrag() {
-        // Momentan nichts tun, aber bereit für zukünftige Features
-        // wie z.B. Schwung-Animation oder Snap-to-Grid
+        // Currently do nothing, but ready for future features
+        // such as momentum animation or snap-to-grid
     }
     
     
     // MARK: - Tagging Actions
     
-    /// Togglet den TOP-Tag für ein Bildpaar
+    /// Toggles the TOP tag for an image pair
     /// - Parameters:
-    ///     - pair: das Bildpaar das getaggt werden soll
-    ///     - completion: Callback mit dem aktualisierten ImagePair (neuer Tag-Status)
+    ///     - pair: the image pair to be tagged
+    ///     - completion: Callback with the updated ImagePair (new tag status)
     func toggleTopTag(for pair: ImagePair, completion: @escaping (ImagePair) -> Void) {
-        // aktuellen Tag-Status umkehren
+        // Reverse current tag status
         let newTagStatus = !pair.hasTopTag
         
         if newTagStatus {
@@ -177,23 +177,23 @@ class ImageViewModel: ObservableObject {
             rawSuccess = tagService.addTag("TOP", to: rawURL)
         }
 
-        // Neues ImagePair mit aktualisiertem Tag-Status erstellen
-        // Wichtig: Wir erstellen ein NEUES ImagePair, da es ein Struct ist (immutable)
-        // Der hasTopTag sollte auf TRUE gesetzt werden, wenn wir erfolgreich getaggt haben
+        // Create new ImagePair with updated tag status
+        // Important: We create a NEW ImagePair since it's a struct (immutable)
+        // The hasTopTag should be set to TRUE if we successfully tagged
         let updatedPair = ImagePair(
             jpegURL: pair.jpegURL,
             rawURL: pair.rawURL,
-            hasTopTag: jpegSuccess && rawSuccess  // TRUE wenn beide Operationen erfolgreich
+            hasTopTag: jpegSuccess && rawSuccess  // TRUE if both operations succeeded
         )
 
-        // Debug-Ausgabe
+        // Debug output
         if jpegSuccess && rawSuccess {
-            print("✅ TOP-Tag hinzugefügt zu: \(pair.jpegURL.lastPathComponent) - neuer Status: \(updatedPair.hasTopTag)")
+            print("✅ TOP tag added to: \(pair.jpegURL.lastPathComponent) - new status: \(updatedPair.hasTopTag)")
         } else {
-            print("❌ Fehler beim Hinzufügen des TOP-Tags - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
+            print("❌ Error adding TOP tag - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
         }
 
-        // Callback mit aktualisiertem Pair aufrufen
+        // Call callback with updated pair
         completion(updatedPair)
     }
     
@@ -205,116 +205,116 @@ class ImageViewModel: ObservableObject {
             rawSuccess = tagService.removeTag("TOP", from: rawURL)
         }
 
-        // Nach dem Entfernen sollte hasTopTag IMMER false sein (auch bei Fehler)
+        // After removal, hasTopTag should ALWAYS be false (even on error)
         let updatedPair = ImagePair(
             jpegURL: pair.jpegURL,
             rawURL: pair.rawURL,
-            hasTopTag: false  // IMMER false nach removeTag
+            hasTopTag: false  // ALWAYS false after removeTag
         )
 
-        // Debug-Ausgabe
+        // Debug output
         if jpegSuccess && rawSuccess {
-            print("✅ TOP-Tag entfernt von: \(pair.jpegURL.lastPathComponent) - neuer Status: \(updatedPair.hasTopTag)")
+            print("✅ TOP tag removed from: \(pair.jpegURL.lastPathComponent) - new status: \(updatedPair.hasTopTag)")
         } else {
-            print("❌ Fehler beim Entfernen des TOP-Tags - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
+            print("❌ Error removing TOP tag - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
         }
 
-        // Callback mit aktualisiertem Pair aufrufen
+        // Call callback with updated pair
         completion(updatedPair)
     }
     
     
     // MARK: - Delete Actions
 
-    /// Verschiebt ein ImagePair in den _toDelete Ordner
+    /// Moves an ImagePair to the _toDelete folder
     /// - Parameters:
-    ///   - pair: Das ImagePair das gelöscht werden soll
-    ///   - folderURL: Der Ordner in dem die Bilder liegen
-    ///   - completion: Callback wenn die Operation fertig ist (true = Erfolg, false = Fehler)
+    ///   - pair: The ImagePair to be deleted
+    ///   - folderURL: The folder where the images are located
+    ///   - completion: Callback when the operation is finished (true = success, false = error)
     func deleteImagePair(pair: ImagePair, in folderURL: URL, completion: @escaping (Bool) -> Void) {
-        // Delete-Service aufrufen um die Dateien zu verschieben
+        // Call delete service to move the files
         let operation: DeleteOperation? = deleteService.deletePair(pair, in: folderURL)
 
-        // Hat es funktioniert?
+        // Did it work?
         if let operation = operation {
-            // Ja! Operation zur History hinzufügen
+            // Yes! Add operation to history
             deleteHistory.append(operation)
-            print("✅ ImagePair gelöscht - History enthält jetzt \(deleteHistory.count) Operationen")
+            print("✅ ImagePair deleted - history now contains \(deleteHistory.count) operations")
 
-            // Callback mit Erfolg aufrufen
+            // Call callback with success
             completion(true)
         } else {
-            // Nein - Fehler!
-            print("❌ Fehler beim Löschen des ImagePairs")
+            // No - error!
+            print("❌ Error deleting ImagePair")
 
-            // Callback mit Fehler aufrufen
+            // Call callback with error
             completion(false)
         }
     }
 
-    /// Macht die letzte Delete-Operation rückgängig
-    /// - Parameter completion: Callback wenn die Operation fertig ist (true = Erfolg, false = Fehler)
+    /// Undoes the last delete operation
+    /// - Parameter completion: Callback when the operation is finished (true = success, false = error)
     func undoLastDelete(completion: @escaping (Bool) -> Void) {
-        // Gibt es überhaupt etwas zum Rückgängigmachen?
+        // Is there anything to undo?
         if deleteHistory.isEmpty {
-            print("⚠️ Keine Delete-Operationen zum Rückgängigmachen")
+            print("⚠️ No delete operations to undo")
             completion(false)
             return
         }
 
-        // Letzte Operation aus der History holen
-        // removeLast() holt das letzte Element UND entfernt es aus dem Array
+        // Get last operation from history
+        // removeLast() gets the last element AND removes it from the array
         let lastOperation: DeleteOperation = deleteHistory.removeLast()
 
-        print("🔄 Mache Delete rückgängig: \(lastOperation.originalJpegURL.lastPathComponent)")
+        print("🔄 Undoing delete: \(lastOperation.originalJpegURL.lastPathComponent)")
 
-        // Delete-Service aufrufen um die Dateien zurück zu verschieben
+        // Call delete service to move the files back
         let success: Bool = deleteService.undoDelete(lastOperation)
 
         if success {
-            print("✅ Undo erfolgreich - History enthält jetzt \(deleteHistory.count) Operationen")
+            print("✅ Undo successful - history now contains \(deleteHistory.count) operations")
             completion(true)
         } else {
-            print("❌ Undo fehlgeschlagen")
-            // Bei Fehler die Operation WIEDER zur History hinzufügen
+            print("❌ Undo failed")
+            // On error, add the operation BACK to history
             deleteHistory.append(lastOperation)
             completion(false)
         }
     }
 
-    /// Prüft ob es Delete-Operationen gibt die rückgängig gemacht werden können
-    /// - Returns: true wenn Undo möglich ist, false wenn nicht
+    /// Checks if there are delete operations that can be undone
+    /// - Returns: true if undo is possible, false if not
     func canUndo() -> Bool {
-        // Einfach prüfen ob die History leer ist oder nicht
+        // Simply check if the history is empty or not
         let hasHistory: Bool = deleteHistory.isEmpty == false
         return hasHistory
     }
 
-    /// Löscht die komplette Delete-History (z.B. bei Ordnerwechsel)
+    /// Clears the complete delete history (e.g. on folder change)
     func clearDeleteHistory() {
         deleteHistory.removeAll()
-        print("🗑️ Delete-History gelöscht")
+        print("🗑️ Delete history cleared")
     }
 
 
     // MARK: - Computed Properties
 
-    /// Gibt den Zoom-Level als Prozentsatz zurück (für UI-Anzeige)
+    /// Returns the zoom level as a percentage (for UI display)
     var zoomPercentage: Int {
         Int(zoomScale * 100)
     }
 
-    /// Prüft ob maximaler Zoom erreicht ist
+    /// Checks if maximum zoom is reached
     var isMaxZoom: Bool {
         zoomScale >= maxZoom
     }
 
-    /// Prüft ob minimaler Zoom erreicht ist
+    /// Checks if minimum zoom is reached
     var isMinZoom: Bool {
         zoomScale <= minZoom
     }
 
-    /// Prüft ob Pan-Funktionalität verfügbar sein sollte
+    /// Checks if pan functionality should be available
     var isPanEnabled: Bool {
         zoomScale > minZoom
     }

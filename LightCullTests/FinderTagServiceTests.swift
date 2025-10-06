@@ -2,7 +2,7 @@
 //  FinderTagServiceTests.swift
 //  LightCullTests
 //
-//  Unit-Tests für den FinderTagService
+//  Unit tests for FinderTagService
 //
 
 import XCTest
@@ -18,15 +18,15 @@ final class FinderTagServiceTests: XCTestCase {
     override func setUp() {
         super.setUp()
         
-        // Service erstellen
+        // Create service
         tagService = FinderTagService()
         
-        // Temporäre Test-Datei erstellen
+        // Create temporary test file
         testFileURL = createTemporaryTestFile()
     }
     
     override func tearDown() {
-        // Test-Datei aufräumen
+        // Clean up test file
         if let url = testFileURL {
             try? FileManager.default.removeItem(at: url)
         }
@@ -39,144 +39,144 @@ final class FinderTagServiceTests: XCTestCase {
     
     // MARK: - Tests
     
-    /// Test: Tag erfolgreich zu einer Datei hinzufügen
+    /// Test: Successfully add tag to a file
     func testAddTag_Success() {
-        // Given: Eine Datei ohne Tags
+        // Given: A file without tags
         let tag = "TOP"
-        
-        // When: Tag hinzufügen
+
+        // When: Add tag
         let success = tagService.addTag(tag, to: testFileURL)
-        
-        // Then: Operation erfolgreich und Tag ist vorhanden
-        XCTAssertTrue(success, "Tag sollte erfolgreich hinzugefügt werden")
-        XCTAssertTrue(tagService.hasTag(tag, at: testFileURL), "Tag sollte nach dem Hinzufügen vorhanden sein")
+
+        // Then: Operation successful and tag is present
+        XCTAssertTrue(success, "Tag should be added successfully")
+        XCTAssertTrue(tagService.hasTag(tag, at: testFileURL), "Tag should be present after adding")
     }
     
-    /// Test: Mehrere verschiedene Tags hinzufügen
+    /// Test: Add multiple different tags
     func testAddMultipleTags_Success() {
-        // Given: Eine Datei ohne Tags
+        // Given: A file without tags
         let tag1 = "TOP"
         let tag2 = "Landscape"
         let tag3 = "Portfolio"
-        
-        // When: Mehrere Tags hinzufügen
+
+        // When: Add multiple tags
         tagService.addTag(tag1, to: testFileURL)
         tagService.addTag(tag2, to: testFileURL)
         tagService.addTag(tag3, to: testFileURL)
-        
-        // Then: Alle Tags sollten vorhanden sein
-        XCTAssertTrue(tagService.hasTag(tag1, at: testFileURL), "Tag 'TOP' sollte vorhanden sein")
-        XCTAssertTrue(tagService.hasTag(tag2, at: testFileURL), "Tag 'Landscape' sollte vorhanden sein")
-        XCTAssertTrue(tagService.hasTag(tag3, at: testFileURL), "Tag 'Portfolio' sollte vorhanden sein")
+
+        // Then: All tags should be present
+        XCTAssertTrue(tagService.hasTag(tag1, at: testFileURL), "Tag 'TOP' should be present")
+        XCTAssertTrue(tagService.hasTag(tag2, at: testFileURL), "Tag 'Landscape' should be present")
+        XCTAssertTrue(tagService.hasTag(tag3, at: testFileURL), "Tag 'Portfolio' should be present")
     }
     
-    /// Test: Gleichen Tag zweimal hinzufügen (Idempotenz)
+    /// Test: Add same tag twice (idempotence)
     func testAddTag_Idempotent() {
-        // Given: Eine Datei ohne Tags
+        // Given: A file without tags
         let tag = "TOP"
-        
-        // When: Gleichen Tag zweimal hinzufügen
+
+        // When: Add same tag twice
         let success1 = tagService.addTag(tag, to: testFileURL)
         let success2 = tagService.addTag(tag, to: testFileURL)
-        
-        // Then: Beide Operationen erfolgreich, aber Tag nur einmal vorhanden
-        XCTAssertTrue(success1, "Erste Operation sollte erfolgreich sein")
-        XCTAssertTrue(success2, "Zweite Operation sollte auch erfolgreich sein (idempotent)")
-        XCTAssertTrue(tagService.hasTag(tag, at: testFileURL), "Tag sollte vorhanden sein")
-        
-        // Zusätzlich: Prüfen dass der Tag nicht doppelt vorhanden ist
-        // Dafür müssen wir direkt die Tags auslesen
+
+        // Then: Both operations successful, but tag present only once
+        XCTAssertTrue(success1, "First operation should be successful")
+        XCTAssertTrue(success2, "Second operation should also be successful (idempotent)")
+        XCTAssertTrue(tagService.hasTag(tag, at: testFileURL), "Tag should be present")
+
+        // Additionally: Check that tag is not present twice
+        // For this we need to read the tags directly
         let resourceValues = try? testFileURL.resourceValues(forKeys: [.tagNamesKey])
         let tags = resourceValues?.tagNames ?? []
         let topTagCount = tags.filter { $0 == tag }.count
-        XCTAssertEqual(topTagCount, 1, "Tag sollte nur einmal vorhanden sein, nicht doppelt")
+        XCTAssertEqual(topTagCount, 1, "Tag should be present only once, not duplicated")
     }
     
-    /// Test: Tag erfolgreich entfernen
+    /// Test: Successfully remove tag
     func testRemoveTag_Success() {
-        // Given: Eine Datei mit einem Tag
+        // Given: A file with a tag
         let tag = "TOP"
         tagService.addTag(tag, to: testFileURL)
-        
-        // When: Tag entfernen
+
+        // When: Remove tag
         let success = tagService.removeTag(tag, from: testFileURL)
-        
-        // Then: Operation erfolgreich und Tag ist nicht mehr vorhanden
-        XCTAssertTrue(success, "Tag sollte erfolgreich entfernt werden")
-        XCTAssertFalse(tagService.hasTag(tag, at: testFileURL), "Tag sollte nach dem Entfernen nicht mehr vorhanden sein")
+
+        // Then: Operation successful and tag is no longer present
+        XCTAssertTrue(success, "Tag should be removed successfully")
+        XCTAssertFalse(tagService.hasTag(tag, at: testFileURL), "Tag should no longer be present after removal")
     }
     
-    /// Test: Tag entfernen der nicht existiert (Idempotenz)
+    /// Test: Remove tag that does not exist (idempotence)
     func testRemoveTag_NonExistentTag_Idempotent() {
-        // Given: Eine Datei ohne Tags
+        // Given: A file without tags
         let tag = "TOP"
-        
-        // When: Nicht-existenten Tag entfernen
+
+        // When: Remove non-existent tag
         let success = tagService.removeTag(tag, from: testFileURL)
-        
-        // Then: Operation sollte erfolgreich sein (nichts zu entfernen ist kein Fehler)
-        XCTAssertTrue(success, "Operation sollte erfolgreich sein, auch wenn Tag nicht existiert")
-        XCTAssertFalse(tagService.hasTag(tag, at: testFileURL), "Tag sollte nicht vorhanden sein")
+
+        // Then: Operation should be successful (nothing to remove is not an error)
+        XCTAssertTrue(success, "Operation should be successful, even if tag does not exist")
+        XCTAssertFalse(tagService.hasTag(tag, at: testFileURL), "Tag should not be present")
     }
     
-    /// Test: Einen von mehreren Tags entfernen
+    /// Test: Remove one of multiple tags
     func testRemoveTag_OneOfMultiple() {
-        // Given: Eine Datei mit mehreren Tags
+        // Given: A file with multiple tags
         let tag1 = "TOP"
         let tag2 = "Landscape"
         let tag3 = "Portfolio"
-        
+
         tagService.addTag(tag1, to: testFileURL)
         tagService.addTag(tag2, to: testFileURL)
         tagService.addTag(tag3, to: testFileURL)
-        
-        // When: Mittleren Tag entfernen
+
+        // When: Remove middle tag
         tagService.removeTag(tag2, from: testFileURL)
-        
-        // Then: Nur der entfernte Tag sollte fehlen
-        XCTAssertTrue(tagService.hasTag(tag1, at: testFileURL), "Tag 'TOP' sollte noch vorhanden sein")
-        XCTAssertFalse(tagService.hasTag(tag2, at: testFileURL), "Tag 'Landscape' sollte entfernt sein")
-        XCTAssertTrue(tagService.hasTag(tag3, at: testFileURL), "Tag 'Portfolio' sollte noch vorhanden sein")
+
+        // Then: Only the removed tag should be missing
+        XCTAssertTrue(tagService.hasTag(tag1, at: testFileURL), "Tag 'TOP' should still be present")
+        XCTAssertFalse(tagService.hasTag(tag2, at: testFileURL), "Tag 'Landscape' should be removed")
+        XCTAssertTrue(tagService.hasTag(tag3, at: testFileURL), "Tag 'Portfolio' should still be present")
     }
     
-    /// Test: hasTag gibt false zurück für nicht-vorhandene Tags
+    /// Test: hasTag returns false for non-existent tags
     func testHasTag_ReturnsFalseForNonExistentTag() {
-        // Given: Eine Datei ohne Tags
+        // Given: A file without tags
         let tag = "TOP"
-        
-        // When & Then: hasTag sollte false zurückgeben
-        XCTAssertFalse(tagService.hasTag(tag, at: testFileURL), "hasTag sollte false für nicht-existenten Tag zurückgeben")
+
+        // When & Then: hasTag should return false
+        XCTAssertFalse(tagService.hasTag(tag, at: testFileURL), "hasTag should return false for non-existent tag")
     }
     
-    /// Test: hasTag gibt true zurück für vorhandene Tags
+    /// Test: hasTag returns true for existing tags
     func testHasTag_ReturnsTrueForExistingTag() {
-        // Given: Eine Datei mit einem Tag
+        // Given: A file with a tag
         let tag = "TOP"
         tagService.addTag(tag, to: testFileURL)
-        
-        // When & Then: hasTag sollte true zurückgeben
-        XCTAssertTrue(tagService.hasTag(tag, at: testFileURL), "hasTag sollte true für existenten Tag zurückgeben")
+
+        // When & Then: hasTag should return true
+        XCTAssertTrue(tagService.hasTag(tag, at: testFileURL), "hasTag should return true for existing tag")
     }
     
-    /// Test: Tags sind Case-Sensitive
+    /// Test: Tags are case-sensitive
     func testTags_AreCaseSensitive() {
-        // Given: Eine Datei mit einem Tag in Großbuchstaben
+        // Given: A file with a tag in uppercase
         tagService.addTag("TOP", to: testFileURL)
-        
-        // When & Then: Kleinbuchstaben-Version sollte NICHT gefunden werden
-        XCTAssertTrue(tagService.hasTag("TOP", at: testFileURL), "'TOP' sollte gefunden werden")
-        XCTAssertFalse(tagService.hasTag("top", at: testFileURL), "'top' sollte NICHT gefunden werden (case-sensitive)")
+
+        // When & Then: Lowercase version should NOT be found
+        XCTAssertTrue(tagService.hasTag("TOP", at: testFileURL), "'TOP' should be found")
+        XCTAssertFalse(tagService.hasTag("top", at: testFileURL), "'top' should NOT be found (case-sensitive)")
     }
     
     // MARK: - Helper Methods
     
-    /// Erstellt eine temporäre Test-Datei im System-Temp-Ordner
+    /// Creates a temporary test file in the system temp folder
     private func createTemporaryTestFile() -> URL {
         let tempDirectory = FileManager.default.temporaryDirectory
         let fileName = "LightCullTest_\(UUID().uuidString).txt"
         let fileURL = tempDirectory.appendingPathComponent(fileName)
         
-        // Leere Datei erstellen
+        // Create empty file
         let testContent = "Test file for FinderTagService"
         try? testContent.write(to: fileURL, atomically: true, encoding: .utf8)
         

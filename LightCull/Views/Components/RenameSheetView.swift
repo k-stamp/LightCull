@@ -2,36 +2,36 @@
 //  RenameSheetView.swift
 //  LightCull
 //
-//  Verantwortlich für: Overlay-Dialog zum Umbenennen von Bildern mit Präfix
+//  Responsible for: Overlay dialog for renaming images with prefix
 //
 
 import SwiftUI
 
 struct RenameSheetView: View {
-    // Die ausgewählten Bildpaare, die umbenannt werden sollen
+    // The selected image pairs to be renamed
     let selectedPairs: [ImagePair]
 
-    // Callback, der aufgerufen wird, wenn Umbenennen geklickt wird
+    // Callback that is called when Rename is clicked
     let onRename: (String) -> Void
 
-    // Callback, der aufgerufen wird, wenn Abbrechen geklickt wird
+    // Callback that is called when Cancel is clicked
     let onCancel: () -> Void
 
-    // Der Präfix, den der User eingibt
+    // The prefix that the user enters
     @State private var prefix: String = ""
 
     var body: some View {
         VStack(spacing: 20) {
-            // Titel
+            // Title
             headerView
 
-            // Info-Text
+            // Info text
             infoView
 
-            // Textfeld für Präfix-Eingabe
+            // Text field for prefix input
             prefixInputView
 
-            // Preview der Umbenennung
+            // Preview of the renaming
             previewView
 
             // Buttons
@@ -44,7 +44,7 @@ struct RenameSheetView: View {
 
     // MARK: - Header
 
-    /// Zeigt den Titel des Dialogs
+    /// Displays the dialog title
     private var headerView: some View {
         Text("Bilder umbenennen")
             .font(.title2)
@@ -53,7 +53,7 @@ struct RenameSheetView: View {
 
     // MARK: - Info
 
-    /// Zeigt Info-Text mit Anzahl der ausgewählten Bilder
+    /// Displays info text with the number of selected images
     private var infoView: some View {
         Text("\(selectedPairs.count) Bild(er) ausgewählt")
             .font(.subheadline)
@@ -62,7 +62,7 @@ struct RenameSheetView: View {
 
     // MARK: - Präfix-Eingabe
 
-    /// Textfeld für die Eingabe des Präfix
+    /// Text field for entering the prefix
     private var prefixInputView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Präfix:")
@@ -76,21 +76,21 @@ struct RenameSheetView: View {
 
     // MARK: - Preview
 
-    /// Zeigt eine Vorschau der Umbenennung
+    /// Displays a preview of the renaming
     private var previewView: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Vorschau:")
                 .font(.headline)
 
-            // Scrollbare Liste mit Vorschau
+            // Scrollable list with preview
             ScrollView {
                 VStack(alignment: .leading, spacing: 4) {
-                    // Wir zeigen maximal 5 Beispiele
+                    // We show a maximum of 5 examples
                     ForEach(getPreviewItems(), id: \.oldName) { item in
                         previewItem(oldName: item.oldName, newName: item.newName)
                     }
 
-                    // Falls mehr als 5 Bilder ausgewählt sind, zeigen wir "..."
+                    // If more than 5 images are selected, we show "..."
                     if selectedPairs.count > 5 {
                         Text("... und \(selectedPairs.count - 5) weitere")
                             .font(.caption)
@@ -106,20 +106,20 @@ struct RenameSheetView: View {
         }
     }
 
-    /// Zeigt eine einzelne Zeile der Vorschau
+    /// Displays a single line of the preview
     private func previewItem(oldName: String, newName: String) -> some View {
         HStack(spacing: 8) {
-            // Alt
+            // Old
             Text(oldName)
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            // Pfeil
+            // Arrow
             Image(systemName: "arrow.right")
                 .font(.caption)
                 .foregroundStyle(.secondary)
 
-            // Neu
+            // New
             Text(newName)
                 .font(.caption)
                 .foregroundStyle(.primary)
@@ -129,23 +129,23 @@ struct RenameSheetView: View {
 
     // MARK: - Buttons
 
-    /// Zeigt die Abbrechen- und Umbenennen-Buttons
+    /// Displays the Cancel and Rename buttons
     private var buttonView: some View {
         HStack(spacing: 12) {
-            // Abbrechen-Button
+            // Cancel button
             Button(action: handleCancel) {
                 Text("Abbrechen")
                     .frame(maxWidth: .infinity)
             }
             .keyboardShortcut(.escape, modifiers: [])
 
-            // Umbenennen-Button
+            // Rename button
             Button(action: handleRename) {
                 Text("Umbenennen")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)
-            .disabled(prefix.isEmpty)  // Deaktiviert wenn kein Präfix eingegeben
+            .disabled(prefix.isEmpty)  // Disabled when no prefix is entered
             .keyboardShortcut(.return, modifiers: [])
         }
         .frame(maxWidth: .infinity)
@@ -153,22 +153,22 @@ struct RenameSheetView: View {
 
     // MARK: - Helper Methods
 
-    /// Gibt eine Liste von Vorschau-Items zurück (maximal 5)
+    /// Returns a list of preview items (maximum 5)
     private func getPreviewItems() -> [(oldName: String, newName: String)] {
-        // Wie viele Pairs sollen wir in der Preview zeigen?
+        // How many pairs should we show in the preview?
         let numberOfItemsToShow: Int = min(selectedPairs.count, 5)
 
-        // Array für die Preview-Items
+        // Array for the preview items
         var items: [(oldName: String, newName: String)] = []
 
-        // Die ersten 5 Pairs durchgehen
+        // Go through the first 5 pairs
         for i in 0..<numberOfItemsToShow {
             let pair: ImagePair = selectedPairs[i]
 
-            // Alten Namen holen
+            // Get old name
             let oldName: String = pair.jpegURL.lastPathComponent
 
-            // Neuen Namen berechnen
+            // Calculate new name
             let newName: String
             if prefix.isEmpty {
                 newName = oldName
@@ -176,7 +176,7 @@ struct RenameSheetView: View {
                 newName = "\(prefix)_\(oldName)"
             }
 
-            // Zum Array hinzufügen
+            // Add to array
             items.append((oldName: oldName, newName: newName))
         }
 
@@ -185,26 +185,26 @@ struct RenameSheetView: View {
 
     // MARK: - Actions
 
-    /// Wird aufgerufen, wenn der Abbrechen-Button geklickt wird
+    /// Called when the Cancel button is clicked
     private func handleCancel() {
         onCancel()
     }
 
-    /// Wird aufgerufen, wenn der Umbenennen-Button geklickt wird
+    /// Called when the Rename button is clicked
     private func handleRename() {
-        // Sicherstellen, dass der Präfix nicht leer ist
+        // Ensure that the prefix is not empty
         if prefix.isEmpty {
             return
         }
 
-        // Callback aufrufen mit dem eingegebenen Präfix
+        // Call callback with the entered prefix
         onRename(prefix)
     }
 }
 
 // MARK: - Previews
 
-#Preview("RenameSheetView - 1 Bild") {
+#Preview("RenameSheetView - 1 Image") {
     RenameSheetView(
         selectedPairs: [
             ImagePair(
@@ -214,15 +214,15 @@ struct RenameSheetView: View {
             )
         ],
         onRename: { prefix in
-            print("Umbenennen mit Präfix: \(prefix)")
+            print("Rename with prefix: \(prefix)")
         },
         onCancel: {
-            print("Abbrechen")
+            print("Cancel")
         }
     )
 }
 
-#Preview("RenameSheetView - Mehrere Bilder") {
+#Preview("RenameSheetView - Multiple Images") {
     RenameSheetView(
         selectedPairs: [
             ImagePair(
@@ -257,10 +257,10 @@ struct RenameSheetView: View {
             )
         ],
         onRename: { prefix in
-            print("Umbenennen mit Präfix: \(prefix)")
+            print("Rename with prefix: \(prefix)")
         },
         onCancel: {
-            print("Abbrechen")
+            print("Cancel")
         }
     )
 }

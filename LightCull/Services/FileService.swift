@@ -15,8 +15,8 @@ class FileService {
     
     // MARK: - Initializer
     
-    /// Initialisiert den FileService mit einem TagService
-    /// - Parameter tagService: Der Service zum Lesen von Finder-Tags
+    /// Initializes the FileService with a TagService
+    /// - Parameter tagService: The service for reading Finder tags
     init(tagService: FinderTagService = FinderTagService()) {
         self.tagService = tagService
     }
@@ -24,13 +24,13 @@ class FileService {
     
     // MARK: - Public Methods
     
-    // findet JPEG/RAW-Paare im angegebenen Ordner
+    // finds JPEG/RAW pairs in the specified folder
     func findImagePairs(in folder: URL) -> [ImagePair] {
         var pairs: [ImagePair] = []
         let fileManager = FileManager.default
         
         
-        // 1. Alle Dateien im Ordner holen
+        // 1. Get all files in the folder
         guard let files = try? fileManager.contentsOfDirectory(
             at: folder,
             includingPropertiesForKeys: nil,
@@ -40,7 +40,7 @@ class FileService {
         }
         
         
-        // 2. Nur JPEG-Dateien herausfiltern und nach Dateinamen sortieren
+        // 2. Filter only JPEG files and sort by filename
         let jpegFiles = files
             .filter { url in
                 let ext = url.pathExtension.lowercased()
@@ -49,19 +49,19 @@ class FileService {
             .sorted { $0.lastPathComponent.localizedStandardCompare($1.lastPathComponent) == .orderedAscending }
         
         
-        // 3. Für jedes JPEG schauen, ob es ein RAW gibt
+        // 3. For each JPEG, check if there is a RAW file
         for jpeg in jpegFiles {
             let baseName = jpeg.deletingPathExtension().lastPathComponent
             
-            // RAW-Datei-Kandidat
+            // RAW file candidate
             let rawCandidate = folder.appendingPathComponent("\(baseName).RAF")
             let rawURL = fileManager.fileExists(atPath: rawCandidate.path) ? rawCandidate : nil
             
-            // Top-Tag Status prüfen (wir pürfen die JPEG-Datei, nicht die RAW. Beim taggen werden
-            // beide getaggt, aber zum Lesen reicht JPEG)
+            // Check Top tag status (we check the JPEG file, not the RAW. When tagging,
+            // both are tagged, but reading the JPEG is sufficient)
             let hasTopTag = tagService.hasTag("TOP", at: jpeg)
             
-            // neues ImagePair hinzufügen
+            // add new ImagePair
             let pair = ImagePair(jpegURL: jpeg, rawURL: rawURL, hasTopTag: hasTopTag)
             pairs.append(pair)
         }

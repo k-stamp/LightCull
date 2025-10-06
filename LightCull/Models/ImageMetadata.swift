@@ -2,21 +2,21 @@
 //  ImageMetadata.swift
 //  LightCull
 //
-//  Repräsentiert die Metadaten eines Bildes (EXIF-Daten + Datei-Info)
+//  Represents the metadata of an image (EXIF data + file info)
 //
 
 import Foundation
 
 struct ImageMetadata {
     
-    // MARK: - Datei-Informationen
-    // Diese Felder sind IMMER vorhanden, daher keine Optionals
+    // MARK: - File Information
+    // These fields are ALWAYS present, therefore not Optionals
     let fileName: String
     let fileSize: String
-    
-    // MARK: - Kamera-Informationen (EXIF)
-    // Diese Felder sind OPTIONAL, da nicht jedes Bild diese Daten hat
-    // (z.B. Screenshots, bearbeitete Bilder, etc.)
+
+    // MARK: - Camera Information (EXIF)
+    // These fields are OPTIONAL, as not every image has this data
+    // (e.g. screenshots, edited images, etc.)
     let cameraMake: String?
     let cameraModel: String?
     let focalLength: String?
@@ -27,11 +27,11 @@ struct ImageMetadata {
 // MARK: - Convenience Initializer
 
 extension ImageMetadata {
-    /// Erstellt ein ImageMetadata-Objekt nur mit Datei-Informationen
-    /// Nützlich wenn keine EXIF-Daten vorhanden sind
+    /// Creates an ImageMetadata object with only file information
+    /// Useful when no EXIF data is available
     /// - Parameters:
-    ///   - fileName: Name der Datei
-    ///   - fileSize: Formatierte Dateigröße
+    ///   - fileName: Name of the file
+    ///   - fileSize: Formatted file size
     init(fileName: String, fileSize: String) {
         self.fileName = fileName
         self.fileSize = fileSize
