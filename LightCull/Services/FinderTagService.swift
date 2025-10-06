@@ -4,62 +4,62 @@
 //
 //  Created by Kevin Stamp on 03.10.25.
 //
-//  Verantwortlich für: Lesen und Schreiben von macOS Finder-Tags
+//  Responsible for: Reading and writing macOS Finder tags
 //
 
 import Foundation
 
 class FinderTagService {
     
-    /// Fügt einen Tag zu einer Datei hinzu
+    /// Adds a tag to a file
     /// - Parameters:
-    ///     - tag: der Name des Tags
-    ///     - url: die URL der Datei
-    /// - Returns: true wenn erfolgreich, false bei Fehler
+    ///     - tag: the name of the tag
+    ///     - url: the URL of the file
+    /// - Returns: true if successful, false on error
     @discardableResult
     func addTag(_ tag: String, to url: URL) -> Bool {
-        // aktuelle Tags von der Datei lesen
+        // read current tags from the file
         guard var currentTags = getTags(from: url) else {
-            // wenn keine tags vorhanden sind, erstelle ein neues Array
+            // if no tags exist, create a new array
             return setTags([tag], to: url)
         }
-        
-        // Prüfen ob Tag bereits existiert
+
+        // check if tag already exists
         if currentTags.contains(tag) {
             return true
         }
-        
-        // Tag zum Array hinzufügen
+
+        // add tag to array
         currentTags.append(tag)
-        
-        // aktualisierte Tag-Liste zurückschreiben
+
+        // write updated tag list back
         return setTags(currentTags, to: url)
     }
     
-    /// Entfernt einen Tag von einer Datei
+    /// Removes a tag from a file
     /// - Parameters:
-    ///     - tag: Der name des Tags
-    ///     - url: Die URL der Datei
-    /// - Returns: true wenn erfolgreich, false bei Fehler
+    ///     - tag: the name of the tag
+    ///     - url: the URL of the file
+    /// - Returns: true if successful, false on error
     @discardableResult
     func removeTag(_ tag: String, from url: URL) -> Bool {
         guard var currentTags = getTags(from: url) else {
             return true
         }
         
-        // Tag aus dem Array entfernen
+        // remove tag from array
         currentTags.removeAll { $0 == tag }
-        
-        // Aktualisierte Tag-Liste zurückschreiben
+
+        // write updated tag list back
         return setTags(currentTags, to: url)
     }
     
     
-    /// Prüft ob eine Datei einen bestimmten Tag hat
+    /// Checks if a file has a specific tag
     /// - Parameters:
-    ///     - tag: Der Name des Tags
-    ///     - url: Die URL der Datei
-    /// - Returns: true wenn der Tag vorhanden ist, false wenn nicht
+    ///     - tag: the name of the tag
+    ///     - url: the URL of the file
+    /// - Returns: true if the tag exists, false if not
     func hasTag(_ tag: String, at url: URL) -> Bool {
         guard let tags = getTags(from: url) else {
             return false
@@ -72,15 +72,15 @@ class FinderTagService {
     
     // MARK: - Helper Methods
     
-    /// Liest alle Tags von einer Datei
-    /// - Parameter url: Die URL der Datei
-    /// - Returns: Array mit Tag-Namen, oder nil bei Fehler
+    /// Reads all tags from a file
+    /// - Parameter url: the URL of the file
+    /// - Returns: array with tag names, or nil on error
     private func getTags(from url: URL) -> [String]? {
-        // URLResourceValues ist ein Container für Datei-Metadaten
-        // WICHTIG: Der Security-Scoped Access muss vom ORDNER kommen (nicht von der Datei)
-        // Der Ordner-Access wird in MainView.handleFolderSelection() gestartet
+        // URLResourceValues is a container for file metadata
+        // IMPORTANT: The security-scoped access must come from the FOLDER (not from the file)
+        // The folder access is started in MainView.handleFolderSelection()
         guard let resourceValues = try? url.resourceValues(forKeys: [.tagNamesKey]) else {
-            print("Fehler beim Lesen der resource Values von: \(url.lastPathComponent)")
+            print("Error reading resource values from: \(url.lastPathComponent)")
             return nil
         }
 
@@ -88,29 +88,29 @@ class FinderTagService {
     }
     
     
-    /// Schreibt Tags zu einer Datei
+    /// Writes tags to a file
     /// - Parameters:
-    ///     - tags: Array mit Tag-Namen
-    ///     - url: Die URL der Datei
-    /// - Returns: true wenn erfolgreich, false bei Fehler
+    ///     - tags: array with tag names
+    ///     - url: the URL of the file
+    /// - Returns: true if successful, false on error
     private func setTags(_ tags: [String], to url: URL) -> Bool {
         var resourceValues = URLResourceValues()
         resourceValues.tagNames = tags
 
-        // wichtig! url muss als var deklariert werden, da setResourcesValues eine mutating Methode ist
+        // important! url must be declared as var since setResourceValues is a mutating method
         var mutableURL = url
 
-        // WICHTIG: Der Security-Scoped Access muss vom ORDNER kommen (nicht von der Datei)
-        // Der Ordner-Access wird in MainView.handleFolderSelection() gestartet
-        // und bleibt aktiv, solange der Ordner ausgewählt ist
+        // IMPORTANT: The security-scoped access must come from the FOLDER (not from the file)
+        // The folder access is started in MainView.handleFolderSelection()
+        // and remains active as long as the folder is selected
 
         do {
-            // Tags zur Datei schreiben
+            // write tags to file
             try mutableURL.setResourceValues(resourceValues)
-            print("✅ Tags erfolgreich geschrieben zu \(url.lastPathComponent)")
+            print("✅ Tags successfully written to \(url.lastPathComponent)")
             return true
         } catch {
-            print("❌ Fehler beim Schreiben der Tags zu \(url.lastPathComponent): \(error.localizedDescription)")
+            print("❌ Error writing tags to \(url.lastPathComponent): \(error.localizedDescription)")
             return false
         }
     }

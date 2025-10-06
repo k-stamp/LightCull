@@ -2,7 +2,7 @@
 //  FileDeleteService.swift
 //  LightCull
 //
-//  Verantwortlich für: Verschieben von Bildern in den _toDelete Ordner
+//  Responsible for: Moving images to the _toDelete folder
 //
 
 import Foundation
@@ -11,59 +11,59 @@ class FileDeleteService {
 
     // MARK: - Public Methods
 
-    /// Verschiebt ein ImagePair in den _toDelete Ordner
+    /// Moves an ImagePair to the _toDelete folder
     /// - Parameters:
-    ///   - pair: Das ImagePair das verschoben werden soll
-    ///   - folderURL: Der Ordner in dem die Bilder aktuell liegen
-    /// - Returns: Eine DeleteOperation für Undo, oder nil bei Fehler
+    ///   - pair: The ImagePair to be moved
+    ///   - folderURL: The folder where the images are currently located
+    /// - Returns: A DeleteOperation for Undo, or nil on error
     func deletePair(_ pair: ImagePair, in folderURL: URL) -> DeleteOperation? {
-        // 1. _toDelete Ordner erstellen (falls er nicht existiert)
+        // 1. Create _toDelete folder (if it doesn't exist)
         let toDeleteFolderURL: URL = folderURL.appendingPathComponent("_toDelete")
         let didCreateFolder: Bool = ensureToDeleteFolderExists(at: toDeleteFolderURL)
 
         if didCreateFolder == false {
-            print("❌ Konnte _toDelete Ordner nicht erstellen")
+            print("❌ Could not create _toDelete folder")
             return nil
         }
 
-        // 2. JPEG verschieben
+        // 2. Move JPEG
         let jpegFileName: String = pair.jpegURL.lastPathComponent
         let newJpegURL: URL = toDeleteFolderURL.appendingPathComponent(jpegFileName)
 
         let jpegMoved: Bool = moveFile(from: pair.jpegURL, to: newJpegURL)
 
         if jpegMoved == false {
-            print("❌ JPEG konnte nicht verschoben werden")
+            print("❌ JPEG could not be moved")
             return nil
         }
 
-        print("✅ JPEG verschoben: \(jpegFileName)")
+        print("✅ JPEG moved: \(jpegFileName)")
 
-        // 3. RAW verschieben (falls vorhanden)
+        // 3. Move RAW (if present)
         var newRawURL: URL? = nil
 
         if let rawURL = pair.rawURL {
-            // Es gibt ein RAW - also verschieben wir es auch
+            // There is a RAW - so we move it too
             let rawFileName: String = rawURL.lastPathComponent
             let targetRawURL: URL = toDeleteFolderURL.appendingPathComponent(rawFileName)
 
             let rawMoved: Bool = moveFile(from: rawURL, to: targetRawURL)
 
             if rawMoved == false {
-                print("❌ RAW konnte nicht verschoben werden")
-                // WICHTIG: JPEG wieder zurück verschieben!
+                print("❌ RAW could not be moved")
+                // IMPORTANT: Move JPEG back!
                 let jpegRestored: Bool = moveFile(from: newJpegURL, to: pair.jpegURL)
                 if jpegRestored {
-                    print("⚠️ JPEG wurde wieder zurückverschoben")
+                    print("⚠️ JPEG was moved back")
                 }
                 return nil
             }
 
             newRawURL = targetRawURL
-            print("✅ RAW verschoben: \(rawFileName)")
+            print("✅ RAW moved: \(rawFileName)")
         }
 
-        // 4. DeleteOperation erstellen für Undo
+        // 4. Create DeleteOperation for Undo
         let operation = DeleteOperation(
             originalJpegURL: pair.jpegURL,
             deletedJpegURL: newJpegURL,
@@ -75,37 +75,37 @@ class FileDeleteService {
         return operation
     }
 
-    /// Macht eine Delete-Operation rückgängig (verschiebt Dateien zurück)
-    /// - Parameter operation: Die DeleteOperation die rückgängig gemacht werden soll
-    /// - Returns: true bei Erfolg, false bei Fehler
+    /// Undoes a delete operation (moves files back)
+    /// - Parameter operation: The DeleteOperation to be undone
+    /// - Returns: true on success, false on error
     func undoDelete(_ operation: DeleteOperation) -> Bool {
-        // 1. JPEG zurück verschieben
+        // 1. Move JPEG back
         let jpegRestored: Bool = moveFile(from: operation.deletedJpegURL, to: operation.originalJpegURL)
 
         if jpegRestored == false {
-            print("❌ JPEG konnte nicht zurückverschoben werden")
+            print("❌ JPEG could not be moved back")
             return false
         }
 
-        print("✅ JPEG wiederhergestellt: \(operation.originalJpegURL.lastPathComponent)")
+        print("✅ JPEG restored: \(operation.originalJpegURL.lastPathComponent)")
 
-        // 2. RAW zurück verschieben (falls vorhanden)
+        // 2. Move RAW back (if present)
         if let deletedRawURL = operation.deletedRawURL {
-            // Wir müssen auch die original RAW URL haben
+            // We also need to have the original RAW URL
             if let originalRawURL = operation.originalRawURL {
                 let rawRestored: Bool = moveFile(from: deletedRawURL, to: originalRawURL)
 
                 if rawRestored == false {
-                    print("❌ RAW konnte nicht zurückverschoben werden")
-                    // WICHTIG: JPEG wieder in _toDelete verschieben!
+                    print("❌ RAW could not be moved back")
+                    // IMPORTANT: Move JPEG back to _toDelete!
                     let jpegMovedBack: Bool = moveFile(from: operation.originalJpegURL, to: operation.deletedJpegURL)
                     if jpegMovedBack {
-                        print("⚠️ JPEG wurde wieder zurück in _toDelete verschoben")
+                        print("⚠️ JPEG was moved back to _toDelete")
                     }
                     return false
                 }
 
-                print("✅ RAW wiederhergestellt: \(originalRawURL.lastPathComponent)")
+                print("✅ RAW restored: \(originalRawURL.lastPathComponent)")
             }
         }
 
@@ -114,60 +114,60 @@ class FileDeleteService {
 
     // MARK: - Private Helper Methods
 
-    /// Stellt sicher dass der _toDelete Ordner existiert
-    /// - Parameter url: Die URL des _toDelete Ordners
-    /// - Returns: true wenn Ordner existiert oder erstellt wurde, false bei Fehler
+    /// Ensures that the _toDelete folder exists
+    /// - Parameter url: The URL of the _toDelete folder
+    /// - Returns: true if folder exists or was created, false on error
     private func ensureToDeleteFolderExists(at url: URL) -> Bool {
         let fileManager = FileManager.default
 
-        // Prüfen ob Ordner bereits existiert
+        // Check if folder already exists
         var isDirectory: ObjCBool = false
         let exists: Bool = fileManager.fileExists(atPath: url.path, isDirectory: &isDirectory)
 
         if exists {
-            // Ordner existiert bereits
+            // Folder already exists
             if isDirectory.boolValue {
-                // Es ist wirklich ein Ordner - alles gut!
+                // It really is a folder - all good!
                 return true
             } else {
-                // Es existiert eine DATEI mit diesem Namen - Fehler!
-                print("❌ '_toDelete' existiert als Datei, nicht als Ordner")
+                // A FILE with this name exists - error!
+                print("❌ '_toDelete' exists as a file, not as a folder")
                 return false
             }
         }
 
-        // Ordner existiert nicht - also erstellen wir ihn
+        // Folder doesn't exist - so we create it
         do {
             try fileManager.createDirectory(at: url, withIntermediateDirectories: false, attributes: nil)
-            print("✅ _toDelete Ordner erstellt")
+            print("✅ _toDelete folder created")
             return true
         } catch {
-            print("❌ Fehler beim Erstellen des _toDelete Ordners: \(error.localizedDescription)")
+            print("❌ Error creating _toDelete folder: \(error.localizedDescription)")
             return false
         }
     }
 
-    /// Verschiebt eine Datei von A nach B
+    /// Moves a file from A to B
     /// - Parameters:
-    ///   - sourceURL: Wo ist die Datei aktuell?
-    ///   - destinationURL: Wo soll die Datei hin?
-    /// - Returns: true bei Erfolg, false bei Fehler
+    ///   - sourceURL: Where is the file currently?
+    ///   - destinationURL: Where should the file go?
+    /// - Returns: true on success, false on error
     private func moveFile(from sourceURL: URL, to destinationURL: URL) -> Bool {
         let fileManager = FileManager.default
 
-        // Prüfen ob Ziel-Datei bereits existiert
+        // Check if destination file already exists
         let destinationExists: Bool = fileManager.fileExists(atPath: destinationURL.path)
         if destinationExists {
-            print("❌ Ziel-Datei existiert bereits: \(destinationURL.lastPathComponent)")
+            print("❌ Destination file already exists: \(destinationURL.lastPathComponent)")
             return false
         }
 
-        // Datei verschieben
+        // Move file
         do {
             try fileManager.moveItem(at: sourceURL, to: destinationURL)
             return true
         } catch {
-            print("❌ Fehler beim Verschieben: \(error.localizedDescription)")
+            print("❌ Error moving file: \(error.localizedDescription)")
             return false
         }
     }

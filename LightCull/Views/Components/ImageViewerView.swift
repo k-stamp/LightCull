@@ -2,7 +2,7 @@
 //  ImageViewerView.swift
 //  LightCull
 //
-//  Verantwortlich für: Hauptbildanzeige mit Zoom- und Pan-Funktionalität
+//  Responsible for: Main image display with zoom and pan functionality
 //
 
 import SwiftUI
@@ -10,42 +10,42 @@ import SwiftUI
 struct ImageViewerView: View {
     let selectedImagePair: ImagePair?
 
-    // ViewModel für Zoom-State Management
-    // Wird von MainView injiziert, damit Toolbar und Viewer synchron sind
+    // ViewModel for zoom state management
+    // Injected from MainView to keep toolbar and viewer synchronized
     @ObservedObject var viewModel: ImageViewModel
 
-    // Callbacks für Navigation zwischen Bildern
+    // Callbacks for navigation between images
     let onPreviousImage: () -> Void
     let onNextImage: () -> Void
 
-    // NEU: Callback für Tag-Toggle
+    // NEW: Callback for tag toggle
     let onToggleTag: () -> Void
 
-    // NEU: Callback für Delete
+    // NEW: Callback for delete
     let onDeleteImage: () -> Void
 
-    // State für Magnification-Geste
+    // State for magnification gesture
     @GestureState private var magnificationState: CGFloat = 1.0
 
-    // State für Drag-Geste (temporäre Verschiebung während des Draggings)
+    // State for drag gesture (temporary displacement during dragging)
     @GestureState private var dragState: CGSize = .zero
     
     var body: some View {
         ZStack {
-            // Hauptinhalt
+            // Main content
             Group {
                 if let selectedImagePair {
-                    // Bildanzeige wenn ein Bild ausgewählt ist
+                    // Image display when an image is selected
                     imageDisplayView(for: selectedImagePair)
                 } else {
-                    // Empty State wenn kein Bild ausgewählt ist
+                    // Empty state when no image is selected
                     emptyStateView
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(.windowBackgroundColor))
-            
-            // Unsichtbare Buttons für Keyboard Shortcuts
+
+            // Invisible buttons for keyboard shortcuts
             VStack {
                 Button("Zoom In") { viewModel.zoomIn() }
                     .keyboardShortcut("+", modifiers: .command)
@@ -67,107 +67,109 @@ struct ImageViewerView: View {
                     .keyboardShortcut(.rightArrow, modifiers: [])
                     .hidden()
 
-                // NEU: Keyboard Shortcut für Tag-Toggle
+                // NEW: Keyboard shortcut for tag toggle
                 Button("Toggle TOP Tag") { onToggleTag() }
                     .keyboardShortcut("t", modifiers: [])
                     .hidden()
 
-                // NEU: Keyboard Shortcut für Delete
+                // NEW: Keyboard shortcut for delete
                 Button("Delete Image") { onDeleteImage() }
                     .keyboardShortcut("d", modifiers: [])
                     .hidden()
             }
             .frame(width: 0, height: 0)
         }
-        // Zoom-State zurücksetzen wenn Bild wechselt
+        // Reset zoom state when image changes
         .onChange(of: selectedImagePair?.id) { _, _ in
             viewModel.resetZoom()
         }
     }
     
     // MARK: - Image Display
-    
-    /// Zeigt das ausgewählte Bild mit Zoom-Funktionalität an
+
+    /// Displays the selected image with zoom functionality
     private func imageDisplayView(for pair: ImagePair) -> some View {
         GeometryReader { geometry in
             AsyncImage(url: pair.jpegURL) { asyncImagePhase in
                 switch asyncImagePhase {
                 case .empty:
-                    // Ladezustand: ProgressView in der Mitte
+                    // Loading state: ProgressView in the center
                     loadingView
-                    
+
                 case .success(let image):
-                    // Erfolgreich geladen: Bild mit Zoom- und Pan-Funktionalität
+                    // Successfully loaded: Image with zoom and pan functionality
                     zoomableImageView(image: image, availableSize: geometry.size)
-                    
+
                 case .failure(_):
-                    // Fehler beim Laden: Fehlermeldung anzeigen
+                    // Loading error: Display error message
                     errorView(for: pair)
-                    
+
                 @unknown default:
-                    // Fallback für zukünftige AsyncImagePhase cases
+                    // Fallback for future AsyncImagePhase cases
                     loadingView
                 }
             }
         }
     }
-    
-    /// Das geladene Bild mit Zoom- und Pan-Gesten-Funktionalität
+
+
+    /// The loaded image with zoom and pan gesture functionality
     private func zoomableImageView(image: Image, availableSize: CGSize) -> some View {
         image
             .resizable()
             .aspectRatio(contentMode: .fit)
             .frame(maxWidth: availableSize.width, maxHeight: availableSize.height)
-            // Zoom anwenden
+            // Apply zoom
             .scaleEffect(viewModel.zoomScale * magnificationState)
-            // Position: gespeicherter Offset + temporärer Drag
+            // Position: stored offset + temporary drag
             .offset(
                 x: viewModel.imageOffset.width + dragState.width,
                 y: viewModel.imageOffset.height + dragState.height
             )
             .position(x: availableSize.width / 2, y: availableSize.height / 2)
-            // Kombinierte Gesten: Magnification UND Drag gleichzeitig
+            // Combined gestures: Magnification AND drag simultaneously
             .gesture(
-                // SimultaneousGesture erlaubt beide Gesten gleichzeitig
+                // SimultaneousGesture allows both gestures at the same time
                 SimultaneousGesture(
-                    // Magnification-Geste für Trackpad-Zoom
+                    // Magnification gesture for trackpad zoom
                     MagnificationGesture()
                         .updating($magnificationState) { currentState, gestureState, _ in
-                            // Während der Geste: temporäre Skalierung
+                            // During gesture: temporary scaling
                             gestureState = currentState
                         }
                         .onEnded { finalMagnification in
-                            // Am Ende der Geste: finale Skalierung anwenden
+                            // At end of gesture: apply final scaling
                             viewModel.handleMagnification(finalMagnification)
                         },
-                    
-                    // Drag-Geste für Verschieben mit 2 Fingern (OHNE Klick!)
-                    // minimumDistance: 0 bedeutet: kein Klick nötig!
+
+
+                    // Drag gesture for panning with 2 fingers (WITHOUT clicking!)
+                    // minimumDistance: 0 means: no click required!
                     DragGesture(minimumDistance: 0)
                         .updating($dragState) { value, gestureState, _ in
-                            // Nur verschieben wenn gezoomt
+                            // Only pan when zoomed
                             guard viewModel.isPanEnabled else { return }
-                            
-                            // Während der Geste: temporäre Verschiebung
+
+                            // During gesture: temporary displacement
                             gestureState = value.translation
                         }
                         .onEnded { value in
-                            // Nur verarbeiten wenn gezoomt
+                            // Only process when zoomed
                             guard viewModel.isPanEnabled else { return }
-                            
-                            // Finale Position berechnen und anwenden
+
+                            // Calculate and apply final position
                             let newOffset = CGSize(
                                 width: viewModel.imageOffset.width + value.translation.width,
                                 height: viewModel.imageOffset.height + value.translation.height
                             )
-                            
-                            // Mit Grenzen-Überprüfung
+
+                            // With bounds checking
                             viewModel.handleDrag(
                                 translation: newOffset,
                                 imageSize: availableSize,
                                 viewSize: availableSize
                             )
-                            
+
                             viewModel.endDrag()
                         }
                 )
@@ -175,32 +177,35 @@ struct ImageViewerView: View {
     }
     
     // MARK: - State Views
-    
-    /// Anzeige während des Ladens
+
+    /// Display during loading
     private var loadingView: some View {
         VStack(spacing: 16) {
             ProgressView()
                 .scaleEffect(1.5)
-            
-            Text("Lade Bild...")
+
+
+            Text("Loading Image...")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
-    
-    /// Anzeige bei Fehlern
+
+
+    /// Display on errors
     private func errorView(for pair: ImagePair) -> some View {
         VStack(spacing: 16) {
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 48))
                 .foregroundStyle(.orange)
-            
-            Text("Fehler beim Laden")
+
+
+            Text("Loading Error")
                 .font(.headline)
                 .foregroundStyle(.primary)
-            
-            Text("Datei: \(pair.jpegURL.lastPathComponent)")
+
+            Text("File: \(pair.jpegURL.lastPathComponent)")
                 .font(.subheadline)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
@@ -208,21 +213,23 @@ struct ImageViewerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
     }
-    
-    /// Anzeige wenn kein Bild ausgewählt ist
+
+
+    /// Display when no image is selected
     private var emptyStateView: some View {
         VStack(spacing: 20) {
             Image(systemName: "photo")
                 .font(.system(size: 64))
                 .foregroundStyle(.tertiary)
-            
+
+
             VStack(spacing: 8) {
-                Text("Kein Bild ausgewählt")
+                Text("No Image Selected")
                     .font(.title2)
                     .fontWeight(.medium)
                     .foregroundStyle(.primary)
-                
-                Text("Wähle ein Bild aus der Thumbnail-Leiste aus")
+
+                Text("Select an image from the thumbnail bar")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)

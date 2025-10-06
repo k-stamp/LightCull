@@ -2,7 +2,7 @@
 //  ImageViewModelTests.swift
 //  LightCullTests
 //
-//  Unit Tests für die Zoom-Funktionalität des ImageViewModel
+//  Unit Tests for the zoom functionality of ImageViewModel
 //
 
 import XCTest
@@ -16,12 +16,12 @@ final class ImageViewModelTests: XCTestCase {
     
     override func setUp() {
         super.setUp()
-        // Vor jedem Test: Neues ViewModel erstellen
+        // Before each test: Create new ViewModel
         viewModel = ImageViewModel()
     }
     
     override func tearDown() {
-        // Nach jedem Test: ViewModel aufräumen
+        // After each test: Clean up ViewModel
         viewModel = nil
         super.tearDown()
     }
@@ -29,21 +29,21 @@ final class ImageViewModelTests: XCTestCase {
     // MARK: - Initial State Tests
     
     func testInitialZoomScale() {
-        // GIVEN: Ein frisch initialisiertes ViewModel
-        // WHEN: Nichts
-        // THEN: Zoom-Scale sollte 1.0 sein (100%)
-        XCTAssertEqual(viewModel.zoomScale, 1.0, "Initial zoom scale sollte 1.0 sein")
+        // GIVEN: A freshly initialized ViewModel
+        // WHEN: Nothing
+        // THEN: Zoom-Scale should be 1.0 (100%)
+        XCTAssertEqual(viewModel.zoomScale, 1.0, "Initial zoom scale should be 1.0")
     }
     
     func testInitialOffset() {
-        // GIVEN: Ein frisch initialisiertes ViewModel
-        // WHEN: Nichts
-        // THEN: Image-Offset sollte zero sein
-        XCTAssertEqual(viewModel.imageOffset, .zero, "Initial offset sollte .zero sein")
+        // GIVEN: A freshly initialized ViewModel
+        // WHEN: Nothing
+        // THEN: Image-Offset should be zero
+        XCTAssertEqual(viewModel.imageOffset, .zero, "Initial offset should be .zero")
     }
     
     func testZoomPercentageCalculation() {
-        // GIVEN: ViewModel mit verschiedenen Zoom-Levels
+        // GIVEN: ViewModel with different zoom levels
         viewModel.zoomScale = 1.0
         XCTAssertEqual(viewModel.zoomPercentage, 100)
         
@@ -57,110 +57,110 @@ final class ImageViewModelTests: XCTestCase {
     // MARK: - Zoom In Tests
     
     func testZoomIn() {
-        // GIVEN: ViewModel mit Standard-Zoom (1.0)
+        // GIVEN: ViewModel with standard zoom (1.0)
         XCTAssertEqual(viewModel.zoomScale, 1.0)
-        
-        // WHEN: ZoomIn wird aufgerufen
+
+        // WHEN: ZoomIn is called
         viewModel.zoomIn()
-        
-        // THEN: Zoom sollte um zoomStep erhöht sein
+
+        // THEN: Zoom should be increased by zoomStep
         XCTAssertEqual(viewModel.zoomScale, 1.25, accuracy: 0.01)
     }
     
     func testZoomInMultipleTimes() {
-        // GIVEN: ViewModel mit Standard-Zoom
-        // WHEN: ZoomIn wird mehrfach aufgerufen
+        // GIVEN: ViewModel with standard zoom
+        // WHEN: ZoomIn is called multiple times
         viewModel.zoomIn() // 1.25
         viewModel.zoomIn() // 1.50
         viewModel.zoomIn() // 1.75
-        
-        // THEN: Zoom sollte entsprechend erhöht sein
+
+        // THEN: Zoom should be increased accordingly
         XCTAssertEqual(viewModel.zoomScale, 1.75, accuracy: 0.01)
     }
     
     func testZoomInRespectMaxZoom() {
-        // GIVEN: ViewModel nahe am Maximum
+        // GIVEN: ViewModel near maximum
         viewModel.zoomScale = 3.9
-        
-        // WHEN: ZoomIn wird aufgerufen
+
+        // WHEN: ZoomIn is called
         viewModel.zoomIn()
-        
-        // THEN: Zoom sollte maxZoom nicht überschreiten
+
+        // THEN: Zoom should not exceed maxZoom
         XCTAssertEqual(viewModel.zoomScale, 4.0, accuracy: 0.01)
         XCTAssertTrue(viewModel.isMaxZoom)
     }
     
     func testZoomInAtMaxZoom() {
-        // GIVEN: ViewModel bereits am Maximum
+        // GIVEN: ViewModel already at maximum
         viewModel.zoomScale = 4.0
-        
-        // WHEN: ZoomIn wird aufgerufen
+
+        // WHEN: ZoomIn is called
         viewModel.zoomIn()
-        
-        // THEN: Zoom sollte bei maxZoom bleiben
+
+        // THEN: Zoom should stay at maxZoom
         XCTAssertEqual(viewModel.zoomScale, 4.0)
     }
     
     // MARK: - Zoom Out Tests
     
     func testZoomOut() {
-        // GIVEN: ViewModel mit erhöhtem Zoom
+        // GIVEN: ViewModel with increased zoom
         viewModel.zoomScale = 2.0
-        
-        // WHEN: ZoomOut wird aufgerufen
+
+        // WHEN: ZoomOut is called
         viewModel.zoomOut()
-        
-        // THEN: Zoom sollte um zoomStep verringert sein
+
+        // THEN: Zoom should be decreased by zoomStep
         XCTAssertEqual(viewModel.zoomScale, 1.75, accuracy: 0.01)
     }
     
     func testZoomOutMultipleTimes() {
-        // GIVEN: ViewModel mit Zoom bei 2.0
+        // GIVEN: ViewModel with zoom at 2.0
         viewModel.zoomScale = 2.0
-        
-        // WHEN: ZoomOut wird mehrfach aufgerufen
+
+        // WHEN: ZoomOut is called multiple times
         viewModel.zoomOut() // 1.75
         viewModel.zoomOut() // 1.50
         viewModel.zoomOut() // 1.25
-        
-        // THEN: Zoom sollte entsprechend verringert sein
+
+        // THEN: Zoom should be decreased accordingly
         XCTAssertEqual(viewModel.zoomScale, 1.25, accuracy: 0.01)
     }
     
     func testZoomOutRespectMinZoom() {
-        // GIVEN: ViewModel nahe am Minimum
+        // GIVEN: ViewModel near minimum
         viewModel.zoomScale = 1.1
-        
-        // WHEN: ZoomOut wird aufgerufen
+
+        // WHEN: ZoomOut is called
         viewModel.zoomOut()
-        
-        // THEN: Zoom sollte minZoom nicht unterschreiten
+
+        // THEN: Zoom should not go below minZoom
         XCTAssertEqual(viewModel.zoomScale, 1.0, accuracy: 0.01)
         XCTAssertTrue(viewModel.isMinZoom)
     }
     
     func testZoomOutAtMinZoom() {
-        // GIVEN: ViewModel bereits am Minimum
+        // GIVEN: ViewModel already at minimum
         viewModel.zoomScale = 1.0
-        
-        // WHEN: ZoomOut wird aufgerufen
+
+        // WHEN: ZoomOut is called
         viewModel.zoomOut()
-        
-        // THEN: Zoom sollte bei minZoom bleiben
+
+        // THEN: Zoom should stay at minZoom
         XCTAssertEqual(viewModel.zoomScale, 1.0)
     }
     
     // MARK: - Reset Zoom Tests
     
     func testResetZoom() {
-        // GIVEN: ViewModel mit erhöhtem Zoom und Offset
+        // GIVEN: ViewModel with increased zoom and offset
         viewModel.zoomScale = 3.0
         viewModel.imageOffset = CGSize(width: 100, height: 50)
-        
-        // WHEN: ResetZoom wird aufgerufen
+
+        // WHEN: ResetZoom is called
         viewModel.resetZoom()
-        
-        // THEN: Zoom und Offset sollten zurückgesetzt sein
+
+        // THEN: Zoom and offset should be reset
         XCTAssertEqual(viewModel.zoomScale, 1.0)
         XCTAssertEqual(viewModel.imageOffset, .zero)
     }
@@ -168,96 +168,96 @@ final class ImageViewModelTests: XCTestCase {
     // MARK: - Set Zoom Tests
     
     func testSetZoomToValidValue() {
-        // GIVEN: ViewModel mit Standard-Zoom
-        // WHEN: SetZoom mit gültigem Wert aufgerufen wird
+        // GIVEN: ViewModel with standard zoom
+        // WHEN: SetZoom is called with valid value
         viewModel.setZoom(to: 2.5)
-        
-        // THEN: Zoom sollte auf den Wert gesetzt sein
+
+        // THEN: Zoom should be set to the value
         XCTAssertEqual(viewModel.zoomScale, 2.5, accuracy: 0.01)
     }
     
     func testSetZoomClampsBelowMin() {
         // GIVEN: ViewModel
-        // WHEN: SetZoom mit Wert unter Minimum aufgerufen wird
+        // WHEN: SetZoom is called with value below minimum
         viewModel.setZoom(to: 0.5)
-        
-        // THEN: Zoom sollte auf minZoom begrenzt sein
+
+        // THEN: Zoom should be clamped to minZoom
         XCTAssertEqual(viewModel.zoomScale, 1.0)
     }
     
     func testSetZoomClampsAboveMax() {
         // GIVEN: ViewModel
-        // WHEN: SetZoom mit Wert über Maximum aufgerufen wird
+        // WHEN: SetZoom is called with value above maximum
         viewModel.setZoom(to: 5.0)
-        
-        // THEN: Zoom sollte auf maxZoom begrenzt sein
+
+        // THEN: Zoom should be clamped to maxZoom
         XCTAssertEqual(viewModel.zoomScale, 4.0)
     }
     
     // MARK: - Handle Magnification Tests
     
     func testHandleMagnificationIncrease() {
-        // GIVEN: ViewModel mit Zoom bei 2.0
+        // GIVEN: ViewModel with zoom at 2.0
         viewModel.zoomScale = 2.0
-        
-        // WHEN: Magnification mit 1.5 (150%) aufgerufen wird
+
+        // WHEN: Magnification is called with 1.5 (150%)
         viewModel.handleMagnification(1.5)
-        
-        // THEN: Zoom sollte auf 3.0 erhöht sein
+
+        // THEN: Zoom should be increased to 3.0
         XCTAssertEqual(viewModel.zoomScale, 3.0, accuracy: 0.01)
     }
     
     func testHandleMagnificationDecrease() {
-        // GIVEN: ViewModel mit Zoom bei 2.0
+        // GIVEN: ViewModel with zoom at 2.0
         viewModel.zoomScale = 2.0
-        
-        // WHEN: Magnification mit 0.5 (50%) aufgerufen wird
+
+        // WHEN: Magnification is called with 0.5 (50%)
         viewModel.handleMagnification(0.5)
-        
-        // THEN: Zoom sollte auf 1.0 verringert sein
+
+        // THEN: Zoom should be decreased to 1.0
         XCTAssertEqual(viewModel.zoomScale, 1.0, accuracy: 0.01)
     }
     
     func testHandleMagnificationRespectMaxZoom() {
-        // GIVEN: ViewModel mit Zoom bei 3.0
+        // GIVEN: ViewModel with zoom at 3.0
         viewModel.zoomScale = 3.0
-        
-        // WHEN: Magnification mit 2.0 würde über Maximum gehen
+
+        // WHEN: Magnification with 2.0 would exceed maximum
         viewModel.handleMagnification(2.0)
-        
-        // THEN: Zoom sollte bei maxZoom begrenzt sein
+
+        // THEN: Zoom should be clamped at maxZoom
         XCTAssertEqual(viewModel.zoomScale, 4.0)
     }
     
     func testHandleMagnificationRespectMinZoom() {
-        // GIVEN: ViewModel mit Zoom bei 2.0
+        // GIVEN: ViewModel with zoom at 2.0
         viewModel.zoomScale = 2.0
-        
-        // WHEN: Magnification mit 0.3 würde unter Minimum gehen
+
+        // WHEN: Magnification with 0.3 would go below minimum
         viewModel.handleMagnification(0.3)
-        
-        // THEN: Zoom sollte bei minZoom begrenzt sein
+
+        // THEN: Zoom should be clamped at minZoom
         XCTAssertEqual(viewModel.zoomScale, 1.0)
     }
     
     // MARK: - Computed Properties Tests
     
     func testIsMinZoom() {
-        // Test wenn am Minimum
+        // Test when at minimum
         viewModel.zoomScale = 1.0
         XCTAssertTrue(viewModel.isMinZoom)
-        
-        // Test wenn über Minimum
+
+        // Test when above minimum
         viewModel.zoomScale = 1.5
         XCTAssertFalse(viewModel.isMinZoom)
     }
     
     func testIsMaxZoom() {
-        // Test wenn am Maximum
+        // Test when at maximum
         viewModel.zoomScale = 4.0
         XCTAssertTrue(viewModel.isMaxZoom)
-        
-        // Test wenn unter Maximum
+
+        // Test when below maximum
         viewModel.zoomScale = 3.5
         XCTAssertFalse(viewModel.isMaxZoom)
     }

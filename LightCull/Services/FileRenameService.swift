@@ -2,7 +2,7 @@
 //  FileRenameService.swift
 //  LightCull
 //
-//  Verantwortlich für: Umbenennen von Bild-Dateien mit Präfix
+//  Responsible for: Renaming image files with prefix
 //
 
 import Foundation
@@ -11,121 +11,121 @@ class FileRenameService {
 
     // MARK: - Public Methods
 
-    /// Benennt eine JPEG-Datei um, indem ein Präfix vor den Dateinamen gesetzt wird
+    /// Renames a JPEG file by adding a prefix before the filename
     /// - Parameters:
-    ///   - jpegURL: Die URL der JPEG-Datei
-    ///   - prefix: Das Präfix, das vor den Dateinamen gesetzt werden soll
-    /// - Returns: Die neue URL der umbenannten Datei, oder nil bei Fehler
+    ///   - jpegURL: The URL of the JPEG file
+    ///   - prefix: The prefix to be added before the filename
+    /// - Returns: The new URL of the renamed file, or nil on error
     func renameJPEG(url jpegURL: URL, withPrefix prefix: String) -> URL? {
-        // 1. Sicherstellen, dass der Präfix nicht leer ist
+        // 1. Ensure that the prefix is not empty
         if prefix.isEmpty {
-            print("⚠️ Präfix ist leer - kein Umbenennen nötig")
+            print("⚠️ Prefix is empty - no renaming necessary")
             return jpegURL
         }
 
-        // 2. Alten Dateinamen holen (mit Extension)
+        // 2. Get old filename (with extension)
         let oldFileName: String = jpegURL.lastPathComponent
 
-        // 3. Neuen Dateinamen bauen: "Präfix_AlterName"
+        // 3. Build new filename: "Prefix_OldName"
         let newFileName: String = "\(prefix)_\(oldFileName)"
 
-        // 4. Neue URL bauen (im gleichen Ordner wie die alte Datei)
+        // 4. Build new URL (in the same folder as the old file)
         let folderURL: URL = jpegURL.deletingLastPathComponent()
         let newURL: URL = folderURL.appendingPathComponent(newFileName)
 
-        // 5. Prüfen ob eine Datei mit dem neuen Namen bereits existiert
+        // 5. Check if a file with the new name already exists
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: newURL.path) {
-            print("❌ Datei existiert bereits: \(newFileName)")
+            print("❌ File already exists: \(newFileName)")
             return nil
         }
 
-        // 6. Datei umbenennen mit FileManager
+        // 6. Rename file with FileManager
         do {
             try fileManager.moveItem(at: jpegURL, to: newURL)
-            print("✅ JPEG umbenannt: \(oldFileName) → \(newFileName)")
+            print("✅ JPEG renamed: \(oldFileName) → \(newFileName)")
             return newURL
         } catch {
-            print("❌ Fehler beim Umbenennen: \(error.localizedDescription)")
+            print("❌ Error renaming: \(error.localizedDescription)")
             return nil
         }
     }
 
-    /// Benennt eine RAW-Datei um, indem ein Präfix vor den Dateinamen gesetzt wird
+    /// Renames a RAW file by adding a prefix before the filename
     /// - Parameters:
-    ///   - rawURL: Die URL der RAW-Datei
-    ///   - prefix: Das Präfix, das vor den Dateinamen gesetzt werden soll
-    /// - Returns: Die neue URL der umbenannten Datei, oder nil bei Fehler
+    ///   - rawURL: The URL of the RAW file
+    ///   - prefix: The prefix to be added before the filename
+    /// - Returns: The new URL of the renamed file, or nil on error
     func renameRAW(url rawURL: URL, withPrefix prefix: String) -> URL? {
-        // Exakt die gleiche Logik wie bei JPEG - nur für RAW-Dateien
+        // Exact same logic as for JPEG - only for RAW files
 
-        // 1. Sicherstellen, dass der Präfix nicht leer ist
+        // 1. Ensure that the prefix is not empty
         if prefix.isEmpty {
-            print("⚠️ Präfix ist leer - kein Umbenennen nötig")
+            print("⚠️ Prefix is empty - no renaming necessary")
             return rawURL
         }
 
-        // 2. Alten Dateinamen holen (mit Extension)
+        // 2. Get old filename (with extension)
         let oldFileName: String = rawURL.lastPathComponent
 
-        // 3. Neuen Dateinamen bauen: "Präfix_AlterName"
+        // 3. Build new filename: "Prefix_OldName"
         let newFileName: String = "\(prefix)_\(oldFileName)"
 
-        // 4. Neue URL bauen (im gleichen Ordner wie die alte Datei)
+        // 4. Build new URL (in the same folder as the old file)
         let folderURL: URL = rawURL.deletingLastPathComponent()
         let newURL: URL = folderURL.appendingPathComponent(newFileName)
 
-        // 5. Prüfen ob eine Datei mit dem neuen Namen bereits existiert
+        // 5. Check if a file with the new name already exists
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: newURL.path) {
-            print("❌ Datei existiert bereits: \(newFileName)")
+            print("❌ File already exists: \(newFileName)")
             return nil
         }
 
-        // 6. Datei umbenennen mit FileManager
+        // 6. Rename file with FileManager
         do {
             try fileManager.moveItem(at: rawURL, to: newURL)
-            print("✅ RAW umbenannt: \(oldFileName) → \(newFileName)")
+            print("✅ RAW renamed: \(oldFileName) → \(newFileName)")
             return newURL
         } catch {
-            print("❌ Fehler beim Umbenennen: \(error.localizedDescription)")
+            print("❌ Error renaming: \(error.localizedDescription)")
             return nil
         }
     }
 
-    /// Benennt ein komplettes ImagePair um (JPEG + optional RAW)
+    /// Renames a complete ImagePair (JPEG + optional RAW)
     /// - Parameters:
-    ///   - pair: Das ImagePair, das umbenannt werden soll
-    ///   - prefix: Das Präfix, das vor den Dateinamen gesetzt werden soll
-    /// - Returns: Ein neues ImagePair mit den neuen URLs, oder nil bei Fehler
+    ///   - pair: The ImagePair to be renamed
+    ///   - prefix: The prefix to be added before the filename
+    /// - Returns: A new ImagePair with the new URLs, or nil on error
     func renamePair(_ pair: ImagePair, withPrefix prefix: String) -> ImagePair? {
-        // 1. JPEG umbenennen
+        // 1. Rename JPEG
         guard let newJPEGURL: URL = renameJPEG(url: pair.jpegURL, withPrefix: prefix) else {
-            print("❌ Fehler beim Umbenennen des JPEG")
+            print("❌ Error renaming JPEG")
             return nil
         }
 
-        // 2. RAW umbenennen (falls vorhanden)
+        // 2. Rename RAW (if present)
         var newRAWURL: URL? = nil
         if let rawURL = pair.rawURL {
-            // RAW-Datei ist vorhanden - auch umbenennen
+            // RAW file is present - rename it too
             newRAWURL = renameRAW(url: rawURL, withPrefix: prefix)
 
-            // Wenn RAW-Umbenennung fehlschlägt, müssen wir JPEG zurück umbenennen
+            // If RAW renaming fails, we need to revert the JPEG rename
             if newRAWURL == nil {
-                print("⚠️ RAW-Umbenennung fehlgeschlagen - mache JPEG-Umbenennung rückgängig")
-                // Rückgängig machen: newJPEGURL zurück zu pair.jpegURL
+                print("⚠️ RAW renaming failed - reverting JPEG rename")
+                // Revert: newJPEGURL back to pair.jpegURL
                 let fileManager = FileManager.default
                 try? fileManager.moveItem(at: newJPEGURL, to: pair.jpegURL)
                 return nil
             }
         }
 
-        // 3. Neues ImagePair erstellen mit den neuen URLs
+        // 3. Create new ImagePair with the new URLs
         let newPair = ImagePair(
             jpegURL: newJPEGURL,
             rawURL: newRAWURL,
-            hasTopTag: pair.hasTopTag  // Tag-Status bleibt gleich
+            hasTopTag: pair.hasTopTag  // Tag status remains the same
         )
 
         return newPair

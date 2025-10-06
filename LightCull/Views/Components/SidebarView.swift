@@ -2,7 +2,7 @@
 //  SidebarView.swift
 //  LightCull
 //
-//  Verantwortlich für: Ordnerauswahl und Info-Anzeige
+//  Responsible for: Folder selection and info display
 //
 
 import SwiftUI
@@ -11,7 +11,7 @@ struct SidebarView: View {
     @Binding var folderURL: URL?
     @Binding var pairs: [ImagePair]
     
-    // NEU: Metadaten des aktuell ausgewählten Bildes
+    // NEW: Metadata of the currently selected image
     let currentMetadata: ImageMetadata?
     
     let onFolderSelected: (URL) -> Void
@@ -46,18 +46,18 @@ struct SidebarView: View {
     // MARK: - Folder Selection Section
     private var folderSelectionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Ordner")
+            Text("Folder")
                 .font(.headline)
                 .padding(.horizontal)
-            
-            Button("Ordner auswählen") {
+
+            Button("Select Folder") {
                 selectFolder()
             }
             .padding(.horizontal)
             
             if let folderURL {
                 VStack(alignment: .leading, spacing: 4) {
-                    Text("Gewählter Ordner:")
+                    Text("Selected Folder:")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                     Text(folderURL.lastPathComponent)
@@ -77,67 +77,67 @@ struct SidebarView: View {
                 .padding(.horizontal)
             
             if pairs.isEmpty {
-                Text("Keine Bildpaare gefunden")
+                Text("No image pairs found")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
             } else {
-                Text("Paare: \(pairs.count)")
+                Text("Pairs: \(pairs.count)")
                     .font(.subheadline)
                     .padding(.horizontal)
             }
         }
     }
     
-    // MARK: - Metadata Section (NEU!)
-    
-    /// Zeigt die Metadaten des aktuell ausgewählten Bildes an
+    // MARK: - Metadata Section (NEW!)
+
+    /// Displays the metadata of the currently selected image
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text("Bild-Informationen")
+            Text("Image Information")
                 .font(.headline)
                 .padding(.horizontal)
-            
-            // Wenn Metadaten vorhanden sind, zeige sie an
+
+            // If metadata is available, display it
             if let metadata = currentMetadata {
                 VStack(alignment: .leading, spacing: 8) {
-                    // Dateiname
-                    metadataRow(label: "Datei", value: metadata.fileName)
-                    
-                    // Dateigröße
-                    metadataRow(label: "Größe", value: metadata.fileSize)
-                    
-                    // Wenn EXIF-Daten vorhanden sind, zeige Trennlinie
+                    // Filename
+                    metadataRow(label: "File", value: metadata.fileName)
+
+                    // File size
+                    metadataRow(label: "Size", value: metadata.fileSize)
+
+                    // If EXIF data is available, show divider
                     if hasAnyExifData(metadata) {
                         Divider()
                             .padding(.horizontal)
                     }
                     
-                    // Kamera-Informationen (nur wenn vorhanden)
+                    // Camera information (only if available)
                     if let make = metadata.cameraMake {
-                        metadataRow(label: "Marke", value: make)
+                        metadataRow(label: "Make", value: make)
                     }
-                    
+
                     if let model = metadata.cameraModel {
-                        metadataRow(label: "Modell", value: model)
+                        metadataRow(label: "Model", value: model)
                     }
-                    
-                    // Aufnahme-Parameter (nur wenn vorhanden)
+
+                    // Capture parameters (only if available)
                     if let focalLength = metadata.focalLength {
-                        metadataRow(label: "Brennweite", value: focalLength)
+                        metadataRow(label: "Focal Length", value: focalLength)
                     }
-                    
+
                     if let aperture = metadata.aperture {
-                        metadataRow(label: "Blende", value: aperture)
+                        metadataRow(label: "Aperture", value: aperture)
                     }
-                    
+
                     if let shutterSpeed = metadata.shutterSpeed {
-                        metadataRow(label: "Belichtung", value: shutterSpeed)
+                        metadataRow(label: "Exposure", value: shutterSpeed)
                     }
                 }
             } else {
-                // Wenn keine Metadaten vorhanden, zeige Platzhalter
-                Text("Kein Bild ausgewählt")
+                // If no metadata is available, show placeholder
+                Text("No image selected")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
@@ -145,8 +145,8 @@ struct SidebarView: View {
         }
     }
     
-    /// Hilfsfunktion: Erstellt eine Zeile mit Label und Wert
-    /// Das ist das typische "Key: Value" Pattern das du aus dem Finder kennst
+    /// Helper function: Creates a row with label and value
+    /// This is the typical "Key: Value" pattern you know from Finder
     private func metadataRow(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
@@ -155,13 +155,13 @@ struct SidebarView: View {
             
             Text(value)
                 .font(.subheadline)
-                .textSelection(.enabled) // Ermöglicht das Kopieren des Wertes
+                .textSelection(.enabled) // Enables copying the value
         }
         .padding(.horizontal)
     }
     
-    /// Prüft ob irgendwelche EXIF-Daten vorhanden sind
-    /// Nützlich um zu entscheiden ob wir eine Trennlinie zeigen
+    /// Checks if any EXIF data is available
+    /// Useful to decide if we should show a divider
     private func hasAnyExifData(_ metadata: ImageMetadata) -> Bool {
         return metadata.cameraMake != nil ||
                metadata.cameraModel != nil ||
@@ -171,8 +171,8 @@ struct SidebarView: View {
     }
     
     // MARK: - Helper Methods
-    
-    /// Öffnet den macOS Dialog zur Ordnerwahl
+
+    /// Opens the macOS dialog for folder selection
     private func selectFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -182,10 +182,10 @@ struct SidebarView: View {
         if panel.runModal() == .OK, let url = panel.url {
             folderURL = url
 
-            // WICHTIG: Security-Scoped Access ZUERST starten (in MainView)
+            // IMPORTANT: Start Security-Scoped Access FIRST (in MainView)
             onFolderSelected(url)
 
-            // DANN erst die Dateien scannen (benötigt den Access um Tags zu lesen)
+            // THEN scan the files (requires the access to read tags)
             pairs = fileService.findImagePairs(in: url)
         }
     }
