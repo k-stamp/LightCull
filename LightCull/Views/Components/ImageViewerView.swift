@@ -63,7 +63,7 @@ struct ImageViewerView: View {
                 Button("Next Image") { onNextImage() }
                     .keyboardShortcut(.rightArrow, modifiers: [])
                     .hidden()
-                
+
                 // NEU: Keyboard Shortcut für Tag-Toggle
                 Button("Toggle TOP Tag") { onToggleTag() }
                     .keyboardShortcut("t", modifiers: [])
