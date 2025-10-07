@@ -37,6 +37,13 @@ struct MainView: View {
     // NEW: Service for renaming files
     private let renameService = FileRenameService()
 
+    // NEW: Service for thumbnail generation
+    private let thumbnailService = ThumbnailService()
+
+    // NEW: State for thumbnail generation progress
+    @State private var isGeneratingThumbnails = false
+    @State private var thumbnailProgress: (current: Int, total: Int) = (0, 0)
+
     // Initialization for tests and previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
         _pairs = State(initialValue: pairs)
@@ -117,8 +124,23 @@ struct MainView: View {
         .sheet(isPresented: $showRenameSheet) {
             renameSheetView
         }
+        // NEW: Show thumbnail progress sheet
+        .sheet(isPresented: $isGeneratingThumbnails) {
+            thumbnailProgressSheetView
+        }
     }
     
+    // MARK: - Thumbnail Progress Sheet (NEW!)
+
+    /// Progress sheet for thumbnail generation
+    private var thumbnailProgressSheetView: some View {
+        ThumbnailProgressView(
+            currentCount: thumbnailProgress.current,
+            totalCount: thumbnailProgress.total
+        )
+        .interactiveDismissDisabled(true)  // Cannot be dismissed during generation
+    }
+
     // MARK: - Rename Sheet (NEW!)
 
     /// Rename sheet for batch renaming
@@ -312,14 +334,14 @@ struct MainView: View {
 
     /// Rescans the folder and updates the pairs
     private func rescanFolder(_ folder: URL) {
-        // Use FileService to reload pairs
-        let fileService = FileService(tagService: tagService)
-        pairs = fileService.findImagePairs(in: folder)
+        // Show progress sheet
+        isGeneratingThumbnails = true
+        thumbnailProgress = (current: 0, total: 0)
 
-        // Reset selected pair
-        selectedPair = nil
-
-        Logger.ui.info("Folder rescanned - \(pairs.count) pairs found")
+        // Rescan asynchronously (to prevent blocking main thread)
+        Task {
+            await loadPairsAndGenerateThumbnails(for: folder)
+        }
     }
 
     // MARK: - Delete Handlers (NEW!)
@@ -450,9 +472,84 @@ struct MainView: View {
         } else {
             Logger.security.info("Security-scoped access started for: \(url.path)")
         }
-        
-        // Select first image
-        selectedPair = pairs.first
+
+        // NEW: Clear old thumbnail cache
+        thumbnailService.clearCache()
+
+        // NEW: Show progress sheet IMMEDIATELY (before any heavy work)
+        isGeneratingThumbnails = true
+        thumbnailProgress = (current: 0, total: 0)
+
+        // NEW: Start loading pairs AND generating thumbnails (async)
+        // This prevents blocking the main thread
+        Task {
+            await loadPairsAndGenerateThumbnails(for: url)
+        }
+    }
+
+    /// Loads image pairs from folder and generates thumbnails
+    private func loadPairsAndGenerateThumbnails(for folderURL: URL) async {
+        Logger.ui.info("Loading pairs from folder: \(folderURL.path)")
+
+        // 1. Load pairs from folder (on background thread)
+        let loadedPairs: [ImagePair] = await Task.detached {
+            // Create FileService
+            let fileService = await FileService(tagService: FinderTagService())
+
+            // Find image pairs (this can take time for large folders)
+            let pairs = await fileService.findImagePairs(in: folderURL)
+
+            await Logger.ui.info("Found \(pairs.count) image pairs")
+            return pairs
+        }.value
+
+        // 2. Update pairs on main thread
+        await MainActor.run {
+            pairs = loadedPairs
+            selectedPair = pairs.first
+
+            // Update progress to show total count
+            thumbnailProgress = (current: 0, total: pairs.count)
+        }
+
+        // 3. Generate thumbnails (if there are any pairs)
+        if loadedPairs.isEmpty == false {
+            await generateThumbnailsForCurrentPairs()
+        }
+
+        // 4. Hide progress sheet (whether there were pairs or not)
+        await MainActor.run {
+            isGeneratingThumbnails = false
+            Logger.ui.info("Folder loading complete")
+        }
+    }
+
+    /// Generates thumbnails for all current pairs
+    /// NOTE: This function does NOT manage the progress sheet!
+    /// The caller is responsible for showing/hiding the sheet.
+    private func generateThumbnailsForCurrentPairs() async {
+        // 1. Are there even any pairs?
+        if pairs.isEmpty {
+            Logger.ui.debug("No pairs to generate thumbnails for")
+            return
+        }
+
+        Logger.ui.info("Starting thumbnail generation for \(pairs.count) pairs")
+
+        // 2. Generate thumbnails (with progress callback)
+        let updatedPairs: [ImagePair] = await thumbnailService.generateThumbnails(for: pairs) { current, total in
+            // This callback is called for each thumbnail
+            // We need to update the UI on the main thread
+            Task { @MainActor in
+                thumbnailProgress = (current: current, total: total)
+            }
+        }
+
+        // 3. Update pairs array with thumbnail URLs
+        await MainActor.run {
+            pairs = updatedPairs
+            Logger.ui.info("Thumbnail generation complete - \(pairs.count) pairs updated")
+        }
     }
     
     /// Stops security-scoped access for the current folder

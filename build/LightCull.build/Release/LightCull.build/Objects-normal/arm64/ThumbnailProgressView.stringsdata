@@ -1,0 +1,32 @@
+{
+  "source": "/Users/kvnstp/Developer/LightCull/LightCull/Views/Components/ThumbnailProgressView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Thumbnails werden erstellt...",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 17
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld von %lld",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 21
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld%%",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 31
+        }
+      }
+    ]
+  },
+  "version": 1
+}

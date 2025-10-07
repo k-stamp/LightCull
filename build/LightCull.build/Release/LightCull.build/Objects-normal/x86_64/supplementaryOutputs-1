@@ -1,0 +1,12 @@
+{
+  "/Users/kvnstp/Developer/LightCull/LightCull/App/LightCullApp.swift" : {
+    "abi-baseline-json" : "/Users/kvnstp/Developer/LightCull/build/LightCull.build/Release/LightCull.build/Objects-normal/x86_64/LightCull.abi.json",
+    "const-values" : "/Users/kvnstp/Developer/LightCull/build/LightCull.build/Release/LightCull.build/Objects-normal/x86_64/LightCull-primary.swiftconstvalues",
+    "dependencies" : "/Users/kvnstp/Developer/LightCull/build/LightCull.build/Release/LightCull.build/Objects-normal/x86_64/LightCull-primary.d",
+    "diagnostics" : "/Users/kvnstp/Developer/LightCull/build/LightCull.build/Release/LightCull.build/Objects-normal/x86_64/LightCull-primary.dia",
+    "objc-header" : "/Users/kvnstp/Developer/LightCull/build/LightCull.build/Release/LightCull.build/Objects-normal/x86_64/LightCull-Swift.h",
+    "swiftdoc" : "/Users/kvnstp/Developer/LightCull/build/LightCull.build/Release/LightCull.build/Objects-normal/x86_64/LightCull.swiftdoc",
+    "swiftmodule" : "/Users/kvnstp/Developer/LightCull/build/LightCull.build/Release/LightCull.build/Objects-normal/x86_64/LightCull.swiftmodule",
+    "swiftsourceinfo" : "/Users/kvnstp/Developer/LightCull/build/LightCull.build/Release/LightCull.build/Objects-normal/x86_64/LightCull.swiftsourceinfo"
+  }
+}

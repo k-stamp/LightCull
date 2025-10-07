@@ -10,6 +10,19 @@ import OSLog
 
 class FileRenameService {
 
+    // MARK: - Dependencies
+
+    // Service for managing thumbnails
+    private let thumbnailService: ThumbnailService
+
+    // MARK: - Initializer
+
+    /// Initializes the FileRenameService with a ThumbnailService
+    /// - Parameter thumbnailService: The service for managing thumbnails
+    init(thumbnailService: ThumbnailService = ThumbnailService()) {
+        self.thumbnailService = thumbnailService
+    }
+
     // MARK: - Public Methods
 
     /// Renames a JPEG file by adding a prefix before the filename
@@ -45,6 +58,15 @@ class FileRenameService {
         do {
             try fileManager.moveItem(at: jpegURL, to: newURL)
             Logger.fileOps.info("JPEG renamed: \(oldFileName) → \(newFileName)")
+
+            // 6b. Rename thumbnail (non-critical - don't abort if it fails)
+            let thumbnailRenamed: Bool = thumbnailService.renameThumbnail(from: jpegURL, to: newURL)
+            if thumbnailRenamed {
+                Logger.fileOps.debug("Thumbnail renamed")
+            } else {
+                Logger.fileOps.notice("Thumbnail could not be renamed (non-critical)")
+            }
+
             return newURL
         } catch {
             Logger.fileOps.error("Error renaming: \(error.localizedDescription)")
