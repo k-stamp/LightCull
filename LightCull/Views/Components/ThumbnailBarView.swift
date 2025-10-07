@@ -294,9 +294,7 @@ struct ThumbnailBarView: View {
         pairs: [],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
-        onRenameSelected: {
-            print("Umbenennen geklickt")
-        }
+        onRenameSelected: { }
     )
 }
 
@@ -321,8 +319,6 @@ struct ThumbnailBarView: View {
         ],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
-        onRenameSelected: {
-            print("Umbenennen geklickt")
-        }
+        onRenameSelected: { }
     )
 }

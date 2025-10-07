@@ -9,6 +9,7 @@
 
 import Foundation
 import ImageIO
+import OSLog
 
 
 class MetadataService {
@@ -19,7 +20,7 @@ class MetadataService {
         // CGImageSourceCreateWithURL is a "reader" for the image file
         // (we don't load the entire image into memory, only the metadata)
         guard let imageSource = CGImageSourceCreateWithURL(url as CFURL, nil) else {
-            print("Could not create ImageSource for: \(url.lastPathComponent)")
+            Logger.metadata.error("Could not create ImageSource for: \(url.lastPathComponent)")
             return nil
         }
         
@@ -29,13 +30,13 @@ class MetadataService {
         // Get Properties Dictionary from image -> The Dictionary contains ALL metadata
         guard let properties = CGImageSourceCopyPropertiesAtIndex(imageSource, 0, nil) as? [String: Any] else {
             // If no properties are available, return only the basic info
-            print("No properties found for: \(fileName)")
+            Logger.metadata.debug("No properties found for: \(fileName)")
             return ImageMetadata(fileName: fileName, fileSize: fileSize)
         }
-        
+
         // Extract EXIF sub-dictionary
         guard let exifData = properties[kCGImagePropertyExifDictionary as String] as? [String: Any] else {
-            print("No EXIF data found for: \(fileName)")
+            Logger.metadata.debug("No EXIF data found for: \(fileName)")
             return ImageMetadata(fileName: fileName, fileSize: fileSize)
         }
         

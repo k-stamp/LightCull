@@ -213,12 +213,8 @@ struct RenameSheetView: View {
                 hasTopTag: false
             )
         ],
-        onRename: { prefix in
-            print("Rename with prefix: \(prefix)")
-        },
-        onCancel: {
-            print("Cancel")
-        }
+        onRename: { _ in },
+        onCancel: { }
     )
 }
 
@@ -256,11 +252,7 @@ struct RenameSheetView: View {
                 hasTopTag: false
             )
         ],
-        onRename: { prefix in
-            print("Rename with prefix: \(prefix)")
-        },
-        onCancel: {
-            print("Cancel")
-        }
+        onRename: { _ in },
+        onCancel: { }
     )
 }

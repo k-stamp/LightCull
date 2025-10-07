@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import OSLog
 
 struct MainView: View {
     @State private var pairs: [ImagePair] = []
@@ -231,7 +232,7 @@ struct MainView: View {
         // 1. Find the index of the old pair
         // We use Equatable (based on URLs), not on hasTopTag!
         guard let index = pairs.firstIndex(where: { $0 == updatedPair }) else {
-            print("⚠️ ImagePair not found in array")
+            Logger.ui.notice("ImagePair not found in array")
             return
         }
 
@@ -245,7 +246,7 @@ struct MainView: View {
         selectedPair = updatedPair
 
         // 4. Debug output
-        print("✅ ImagePair updated: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
+        Logger.ui.info("ImagePair updated: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
     }
 
     // MARK: - Rename Handlers (NEW!)
@@ -276,7 +277,7 @@ struct MainView: View {
             let newPair: ImagePair? = renameService.renamePair(pair, withPrefix: prefix)
 
             if newPair == nil {
-                print("⚠️ Error renaming: \(pair.jpegURL.lastPathComponent)")
+                Logger.ui.notice("Error renaming: \(pair.jpegURL.lastPathComponent)")
             }
         }
 
@@ -318,7 +319,7 @@ struct MainView: View {
         // Reset selected pair
         selectedPair = nil
 
-        print("✅ Folder rescanned - \(pairs.count) pairs found")
+        Logger.ui.info("Folder rescanned - \(pairs.count) pairs found")
     }
 
     // MARK: - Delete Handlers (NEW!)
@@ -327,20 +328,20 @@ struct MainView: View {
     private func handleDelete() {
         // 1. Is there even a selected image?
         guard let currentPair = selectedPair else {
-            print("⚠️ No image selected - cannot delete")
+            Logger.ui.notice("No image selected - cannot delete")
             return
         }
 
         // 2. Is there a selected folder?
         guard let folder = folderURL else {
-            print("⚠️ No folder selected - cannot delete")
+            Logger.ui.notice("No folder selected - cannot delete")
             return
         }
 
         // 3. Remember the index of the current image (for navigation after delete)
         let currentIndex: Int? = pairs.firstIndex(of: currentPair)
 
-        print("🗑️ Deleting image: \(currentPair.jpegURL.lastPathComponent)")
+        Logger.ui.debug("Deleting image: \(currentPair.jpegURL.lastPathComponent)")
 
         // 4. Call ViewModel to delete the image
         imageViewModel.deleteImagePair(pair: currentPair, in: folder) { success in
@@ -348,7 +349,7 @@ struct MainView: View {
 
             if success {
                 // Delete was successful!
-                print("✅ Delete successful")
+                Logger.ui.info("Delete successful")
 
                 // 5. Rescan folder (so the deleted image disappears)
                 rescanFolder(folder)
@@ -357,7 +358,7 @@ struct MainView: View {
                 selectNextImageAfterDelete(deletedIndex: currentIndex)
             } else {
                 // Delete failed
-                print("❌ Delete failed")
+                Logger.ui.error("Delete failed")
             }
         }
     }
@@ -368,17 +369,17 @@ struct MainView: View {
         let canUndo: Bool = imageViewModel.canUndo()
 
         if canUndo == false {
-            print("⚠️ Nothing to undo")
+            Logger.ui.notice("Nothing to undo")
             return
         }
 
         // 2. Is there a selected folder?
         guard let folder = folderURL else {
-            print("⚠️ No folder selected - cannot undo")
+            Logger.ui.notice("No folder selected - cannot undo")
             return
         }
 
-        print("🔄 Undoing last deletion")
+        Logger.ui.debug("Undoing last deletion")
 
         // 3. Call ViewModel to execute the undo
         imageViewModel.undoLastDelete { success in
@@ -386,7 +387,7 @@ struct MainView: View {
 
             if success {
                 // Undo was successful!
-                print("✅ Undo successful")
+                Logger.ui.info("Undo successful")
 
                 // 4. Rescan folder (so the restored image appears)
                 rescanFolder(folder)
@@ -397,7 +398,7 @@ struct MainView: View {
                 }
             } else {
                 // Undo failed
-                print("❌ Undo failed")
+                Logger.ui.error("Undo failed")
             }
         }
     }
@@ -409,7 +410,7 @@ struct MainView: View {
         if pairs.isEmpty {
             // No more images - select nothing
             selectedPair = nil
-            print("📭 No more images in folder")
+            Logger.ui.info("No more images in folder")
             return
         }
 
@@ -443,11 +444,11 @@ struct MainView: View {
 
         // NEW: Start security-scoped access for the selected folder
         isAccessingSecurityScope = url.startAccessingSecurityScopedResource()
-        
+
         if !isAccessingSecurityScope {
-            print("⚠️ Could not start security-scoped access for: \(url.path)")
+            Logger.security.notice("Could not start security-scoped access for: \(url.path)")
         } else {
-            print("✅ Security-scoped access started for: \(url.path)")
+            Logger.security.info("Security-scoped access started for: \(url.path)")
         }
         
         // Select first image
@@ -462,7 +463,7 @@ struct MainView: View {
         
         url.stopAccessingSecurityScopedResource()
         isAccessingSecurityScope = false
-        print("🛑 Security-scoped access stopped for: \(url.path)")
+        Logger.security.info("Security-scoped access stopped for: \(url.path)")
     }
 
     /// Jumps to the previous image in the list
@@ -495,12 +496,12 @@ struct MainView: View {
         }
         
         currentMetadata = metadataService.extractMetadata(from: pair.jpegURL)
-        
+
         // Debug output (you can remove this later)
         if let metadata = currentMetadata {
-            print("Metadata loaded: \(metadata.fileName)")
+            Logger.ui.debug("Metadata loaded: \(metadata.fileName)")
         } else {
-            print("No metadata available for: \(pair.jpegURL.lastPathComponent)")
+            Logger.ui.debug("No metadata available for: \(pair.jpegURL.lastPathComponent)")
         }
     }
     

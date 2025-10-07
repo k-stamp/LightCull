@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import OSLog
 
 /// ViewModel for image display with zoom functionality
 class ImageViewModel: ObservableObject {
@@ -188,9 +189,9 @@ class ImageViewModel: ObservableObject {
 
         // Debug output
         if jpegSuccess && rawSuccess {
-            print("✅ TOP tag added to: \(pair.jpegURL.lastPathComponent) - new status: \(updatedPair.hasTopTag)")
+            Logger.tagging.info("TOP tag added to: \(pair.jpegURL.lastPathComponent) - new status: \(updatedPair.hasTopTag)")
         } else {
-            print("❌ Error adding TOP tag - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
+            Logger.tagging.error("Error adding TOP tag - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
         }
 
         // Call callback with updated pair
@@ -214,9 +215,9 @@ class ImageViewModel: ObservableObject {
 
         // Debug output
         if jpegSuccess && rawSuccess {
-            print("✅ TOP tag removed from: \(pair.jpegURL.lastPathComponent) - new status: \(updatedPair.hasTopTag)")
+            Logger.tagging.info("TOP tag removed from: \(pair.jpegURL.lastPathComponent) - new status: \(updatedPair.hasTopTag)")
         } else {
-            print("❌ Error removing TOP tag - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
+            Logger.tagging.error("Error removing TOP tag - jpeg: \(jpegSuccess), raw: \(rawSuccess)")
         }
 
         // Call callback with updated pair
@@ -239,13 +240,13 @@ class ImageViewModel: ObservableObject {
         if let operation = operation {
             // Yes! Add operation to history
             deleteHistory.append(operation)
-            print("✅ ImagePair deleted - history now contains \(deleteHistory.count) operations")
+            Logger.fileOps.info("ImagePair deleted - history now contains \(self.deleteHistory.count) operations")
 
             // Call callback with success
             completion(true)
         } else {
             // No - error!
-            print("❌ Error deleting ImagePair")
+            Logger.fileOps.error("Error deleting ImagePair")
 
             // Call callback with error
             completion(false)
@@ -257,7 +258,7 @@ class ImageViewModel: ObservableObject {
     func undoLastDelete(completion: @escaping (Bool) -> Void) {
         // Is there anything to undo?
         if deleteHistory.isEmpty {
-            print("⚠️ No delete operations to undo")
+            Logger.fileOps.notice("No delete operations to undo")
             completion(false)
             return
         }
@@ -266,18 +267,18 @@ class ImageViewModel: ObservableObject {
         // removeLast() gets the last element AND removes it from the array
         let lastOperation: DeleteOperation = deleteHistory.removeLast()
 
-        print("🔄 Undoing delete: \(lastOperation.originalJpegURL.lastPathComponent)")
+        Logger.fileOps.debug("Undoing delete: \(lastOperation.originalJpegURL.lastPathComponent)")
 
         // Call delete service to move the files back
         let success: Bool = deleteService.undoDelete(lastOperation)
 
         if success {
-            print("✅ Undo successful - history now contains \(deleteHistory.count) operations")
+            Logger.fileOps.info("Undo successful - history now contains \(self.deleteHistory.count) operations")
             completion(true)
         } else {
-            print("❌ Undo failed")
+            Logger.fileOps.error("Undo failed")
             // On error, add the operation BACK to history
-            deleteHistory.append(lastOperation)
+            self.deleteHistory.append(lastOperation)
             completion(false)
         }
     }
@@ -293,7 +294,7 @@ class ImageViewModel: ObservableObject {
     /// Clears the complete delete history (e.g. on folder change)
     func clearDeleteHistory() {
         deleteHistory.removeAll()
-        print("🗑️ Delete history cleared")
+        Logger.fileOps.debug("Delete history cleared")
     }
 
 
@@ -319,3 +320,4 @@ class ImageViewModel: ObservableObject {
         zoomScale > minZoom
     }
 }
+

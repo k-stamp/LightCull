@@ -8,6 +8,7 @@
 //
 
 import Foundation
+import OSLog
 
 class FinderTagService {
     
@@ -80,7 +81,7 @@ class FinderTagService {
         // IMPORTANT: The security-scoped access must come from the FOLDER (not from the file)
         // The folder access is started in MainView.handleFolderSelection()
         guard let resourceValues = try? url.resourceValues(forKeys: [.tagNamesKey]) else {
-            print("Error reading resource values from: \(url.lastPathComponent)")
+            Logger.tagging.error("Error reading resource values from: \(url.lastPathComponent)")
             return nil
         }
 
@@ -107,10 +108,10 @@ class FinderTagService {
         do {
             // write tags to file
             try mutableURL.setResourceValues(resourceValues)
-            print("✅ Tags successfully written to \(url.lastPathComponent)")
+            Logger.tagging.info("Tags successfully written to \(url.lastPathComponent)")
             return true
         } catch {
-            print("❌ Error writing tags to \(url.lastPathComponent): \(error.localizedDescription)")
+            Logger.tagging.error("Error writing tags to \(url.lastPathComponent): \(error.localizedDescription)")
             return false
         }
     }
