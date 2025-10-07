@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import OSLog
 
 class FileDeleteService {
 
@@ -22,7 +23,7 @@ class FileDeleteService {
         let didCreateFolder: Bool = ensureToDeleteFolderExists(at: toDeleteFolderURL)
 
         if didCreateFolder == false {
-            print("❌ Could not create _toDelete folder")
+            Logger.fileOps.error("Could not create _toDelete folder")
             return nil
         }
 
@@ -33,11 +34,11 @@ class FileDeleteService {
         let jpegMoved: Bool = moveFile(from: pair.jpegURL, to: newJpegURL)
 
         if jpegMoved == false {
-            print("❌ JPEG could not be moved")
+            Logger.fileOps.error("JPEG could not be moved")
             return nil
         }
 
-        print("✅ JPEG moved: \(jpegFileName)")
+        Logger.fileOps.info("JPEG moved: \(jpegFileName)")
 
         // 3. Move RAW (if present)
         var newRawURL: URL? = nil
@@ -50,17 +51,17 @@ class FileDeleteService {
             let rawMoved: Bool = moveFile(from: rawURL, to: targetRawURL)
 
             if rawMoved == false {
-                print("❌ RAW could not be moved")
+                Logger.fileOps.error("RAW could not be moved")
                 // IMPORTANT: Move JPEG back!
                 let jpegRestored: Bool = moveFile(from: newJpegURL, to: pair.jpegURL)
                 if jpegRestored {
-                    print("⚠️ JPEG was moved back")
+                    Logger.fileOps.notice("JPEG was moved back")
                 }
                 return nil
             }
 
             newRawURL = targetRawURL
-            print("✅ RAW moved: \(rawFileName)")
+            Logger.fileOps.info("RAW moved: \(rawFileName)")
         }
 
         // 4. Create DeleteOperation for Undo
@@ -83,11 +84,11 @@ class FileDeleteService {
         let jpegRestored: Bool = moveFile(from: operation.deletedJpegURL, to: operation.originalJpegURL)
 
         if jpegRestored == false {
-            print("❌ JPEG could not be moved back")
+            Logger.fileOps.error("JPEG could not be moved back")
             return false
         }
 
-        print("✅ JPEG restored: \(operation.originalJpegURL.lastPathComponent)")
+        Logger.fileOps.info("JPEG restored: \(operation.originalJpegURL.lastPathComponent)")
 
         // 2. Move RAW back (if present)
         if let deletedRawURL = operation.deletedRawURL {
@@ -96,16 +97,16 @@ class FileDeleteService {
                 let rawRestored: Bool = moveFile(from: deletedRawURL, to: originalRawURL)
 
                 if rawRestored == false {
-                    print("❌ RAW could not be moved back")
+                    Logger.fileOps.error("RAW could not be moved back")
                     // IMPORTANT: Move JPEG back to _toDelete!
                     let jpegMovedBack: Bool = moveFile(from: operation.originalJpegURL, to: operation.deletedJpegURL)
                     if jpegMovedBack {
-                        print("⚠️ JPEG was moved back to _toDelete")
+                        Logger.fileOps.notice("JPEG was moved back to _toDelete")
                     }
                     return false
                 }
 
-                print("✅ RAW restored: \(originalRawURL.lastPathComponent)")
+                Logger.fileOps.info("RAW restored: \(originalRawURL.lastPathComponent)")
             }
         }
 
@@ -131,7 +132,7 @@ class FileDeleteService {
                 return true
             } else {
                 // A FILE with this name exists - error!
-                print("❌ '_toDelete' exists as a file, not as a folder")
+                Logger.fileOps.error("'_toDelete' exists as a file, not as a folder")
                 return false
             }
         }
@@ -139,10 +140,10 @@ class FileDeleteService {
         // Folder doesn't exist - so we create it
         do {
             try fileManager.createDirectory(at: url, withIntermediateDirectories: false, attributes: nil)
-            print("✅ _toDelete folder created")
+            Logger.fileOps.info("_toDelete folder created")
             return true
         } catch {
-            print("❌ Error creating _toDelete folder: \(error.localizedDescription)")
+            Logger.fileOps.error("Error creating _toDelete folder: \(error.localizedDescription)")
             return false
         }
     }
@@ -158,7 +159,7 @@ class FileDeleteService {
         // Check if destination file already exists
         let destinationExists: Bool = fileManager.fileExists(atPath: destinationURL.path)
         if destinationExists {
-            print("❌ Destination file already exists: \(destinationURL.lastPathComponent)")
+            Logger.fileOps.error("Destination file already exists: \(destinationURL.lastPathComponent)")
             return false
         }
 
@@ -167,7 +168,7 @@ class FileDeleteService {
             try fileManager.moveItem(at: sourceURL, to: destinationURL)
             return true
         } catch {
-            print("❌ Error moving file: \(error.localizedDescription)")
+            Logger.fileOps.error("Error moving file: \(error.localizedDescription)")
             return false
         }
     }

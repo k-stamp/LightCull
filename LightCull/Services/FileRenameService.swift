@@ -6,6 +6,7 @@
 //
 
 import Foundation
+import OSLog
 
 class FileRenameService {
 
@@ -19,7 +20,7 @@ class FileRenameService {
     func renameJPEG(url jpegURL: URL, withPrefix prefix: String) -> URL? {
         // 1. Ensure that the prefix is not empty
         if prefix.isEmpty {
-            print("⚠️ Prefix is empty - no renaming necessary")
+            Logger.fileOps.notice("Prefix is empty - no renaming necessary")
             return jpegURL
         }
 
@@ -36,17 +37,17 @@ class FileRenameService {
         // 5. Check if a file with the new name already exists
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: newURL.path) {
-            print("❌ File already exists: \(newFileName)")
+            Logger.fileOps.error("File already exists: \(newFileName)")
             return nil
         }
 
         // 6. Rename file with FileManager
         do {
             try fileManager.moveItem(at: jpegURL, to: newURL)
-            print("✅ JPEG renamed: \(oldFileName) → \(newFileName)")
+            Logger.fileOps.info("JPEG renamed: \(oldFileName) → \(newFileName)")
             return newURL
         } catch {
-            print("❌ Error renaming: \(error.localizedDescription)")
+            Logger.fileOps.error("Error renaming: \(error.localizedDescription)")
             return nil
         }
     }
@@ -61,7 +62,7 @@ class FileRenameService {
 
         // 1. Ensure that the prefix is not empty
         if prefix.isEmpty {
-            print("⚠️ Prefix is empty - no renaming necessary")
+            Logger.fileOps.notice("Prefix is empty - no renaming necessary")
             return rawURL
         }
 
@@ -78,17 +79,17 @@ class FileRenameService {
         // 5. Check if a file with the new name already exists
         let fileManager = FileManager.default
         if fileManager.fileExists(atPath: newURL.path) {
-            print("❌ File already exists: \(newFileName)")
+            Logger.fileOps.error("File already exists: \(newFileName)")
             return nil
         }
 
         // 6. Rename file with FileManager
         do {
             try fileManager.moveItem(at: rawURL, to: newURL)
-            print("✅ RAW renamed: \(oldFileName) → \(newFileName)")
+            Logger.fileOps.info("RAW renamed: \(oldFileName) → \(newFileName)")
             return newURL
         } catch {
-            print("❌ Error renaming: \(error.localizedDescription)")
+            Logger.fileOps.error("Error renaming: \(error.localizedDescription)")
             return nil
         }
     }
@@ -101,7 +102,7 @@ class FileRenameService {
     func renamePair(_ pair: ImagePair, withPrefix prefix: String) -> ImagePair? {
         // 1. Rename JPEG
         guard let newJPEGURL: URL = renameJPEG(url: pair.jpegURL, withPrefix: prefix) else {
-            print("❌ Error renaming JPEG")
+            Logger.fileOps.error("Error renaming JPEG")
             return nil
         }
 
@@ -113,7 +114,7 @@ class FileRenameService {
 
             // If RAW renaming fails, we need to revert the JPEG rename
             if newRAWURL == nil {
-                print("⚠️ RAW renaming failed - reverting JPEG rename")
+                Logger.fileOps.notice("RAW renaming failed - reverting JPEG rename")
                 // Revert: newJPEGURL back to pair.jpegURL
                 let fileManager = FileManager.default
                 try? fileManager.moveItem(at: newJPEGURL, to: pair.jpegURL)
