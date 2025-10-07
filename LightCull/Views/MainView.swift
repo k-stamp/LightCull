@@ -96,14 +96,17 @@ struct MainView: View {
             }
             // Toolbar at the top edge of the window
             .toolbar {
-                // NEW: Tag button on the left in the toolbar
-                ToolbarItem(placement: .navigation) {
-                    tagButtonView
-                }
-                
                 ToolbarItem(placement: .primaryAction) {
-                    // Zoom controls on the right in the toolbar
-                    zoomControlsView
+                    HStack(spacing: 12) {
+                        // Tag button on the left of zoom controls
+                        tagButtonView
+
+                        Divider()
+                            .frame(height: 20)
+
+                        // Zoom controls on the right
+                        zoomControlsView
+                    }
                 }
             }
         }
@@ -167,7 +170,7 @@ struct MainView: View {
             handleToggleTag()
         }) {
             Image(systemName: selectedPair?.hasTopTag == true ? "star.fill" : "star")
-                .imageScale(.medium)
+                .imageScale(.large)
                 .foregroundStyle(selectedPair?.hasTopTag == true ? .yellow : .primary)
         }
         .disabled(selectedPair == nil)
@@ -178,17 +181,17 @@ struct MainView: View {
     
     /// Zoom slider and buttons for the toolbar
     private var zoomControlsView: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 4) {
             // Zoom Out Button
             Button(action: {
                 imageViewModel.zoomOut()
             }) {
                 Image(systemName: "minus.magnifyingglass")
-                    .imageScale(.medium)
+                    .imageScale(.large)
             }
             .disabled(imageViewModel.isMinZoom)
             .help("Zoom out (⌘-)")
-            
+
             // Zoom slider with percentage display
             HStack(spacing: 8) {
                 // CORRECTION: Direct binding to @Published property
@@ -199,30 +202,30 @@ struct MainView: View {
                 )
                 .frame(width: 120)
                 .disabled(selectedPair == nil)
-                
+
                 Text("\(imageViewModel.zoomPercentage)%")
-                    .font(.caption)
+                    .font(.body)
                     .monospacedDigit() // Prevents digit jumping
-                    .frame(minWidth: 45, alignment: .trailing)
+                    .frame(minWidth: 50, alignment: .trailing)
                     .foregroundStyle(selectedPair == nil ? .secondary : .primary)
             }
-            
+
             // Zoom In Button
             Button(action: {
                 imageViewModel.zoomIn()
             }) {
                 Image(systemName: "plus.magnifyingglass")
-                    .imageScale(.medium)
+                    .imageScale(.large)
             }
             .disabled(imageViewModel.isMaxZoom)
             .help("Zoom in (⌘+)")
-            
+
             // Reset Zoom Button
             Button(action: {
                 imageViewModel.resetZoom()
             }) {
                 Image(systemName: "arrow.counterclockwise")
-                    .imageScale(.medium)
+                    .imageScale(.large)
             }
             .disabled(imageViewModel.isMinZoom)
             .help("Reset zoom (⌘0)")
