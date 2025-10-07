@@ -144,6 +144,33 @@ class ImageViewModel: ObservableObject {
 
         imageOffset = CGSize(width: clampedX, height: clampedY)
     }
+
+    /// Adjusts the pan bounds when the image changes
+    /// This ensures the pan offset stays valid for images with different aspect ratios
+    /// - Parameters:
+    ///   - imageSize: The size of the new image
+    ///   - viewSize: The size of the view area
+    func adjustPanBounds(imageSize: CGSize, viewSize: CGSize) {
+        // Only adjust when zoomed
+        guard zoomScale > minZoom else {
+            imageOffset = .zero
+            return
+        }
+
+        // Calculate boundaries based on current zoom level
+        let scaledImageWidth = imageSize.width * zoomScale
+        let scaledImageHeight = imageSize.height * zoomScale
+
+        // Maximum translation in both directions
+        let maxOffsetX = max(0, (scaledImageWidth - viewSize.width) / 2)
+        let maxOffsetY = max(0, (scaledImageHeight - viewSize.height) / 2)
+
+        // Clamp current offset to new bounds
+        let clampedX = min(max(imageOffset.width, -maxOffsetX), maxOffsetX)
+        let clampedY = min(max(imageOffset.height, -maxOffsetY), maxOffsetY)
+
+        imageOffset = CGSize(width: clampedX, height: clampedY)
+    }
     
     /// Called when a drag gesture ends
     /// Can be used for momentum effects or snap behavior
