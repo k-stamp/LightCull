@@ -79,10 +79,6 @@ struct ImageViewerView: View {
             }
             .frame(width: 0, height: 0)
         }
-        // Reset zoom state when image changes
-        .onChange(of: selectedImagePair?.id) { _, _ in
-            viewModel.resetZoom()
-        }
     }
     
     // MARK: - Image Display
@@ -127,6 +123,10 @@ struct ImageViewerView: View {
                 y: viewModel.imageOffset.height + dragState.height
             )
             .position(x: availableSize.width / 2, y: availableSize.height / 2)
+            // Adjust pan bounds when image loads (to handle different aspect ratios)
+            .onAppear {
+                viewModel.adjustPanBounds(imageSize: availableSize, viewSize: availableSize)
+            }
             // Combined gestures: Magnification AND drag simultaneously
             .gesture(
                 // SimultaneousGesture allows both gestures at the same time
