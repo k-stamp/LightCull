@@ -1,0 +1,64 @@
+{
+  "source": "/Users/kvnstp/Developer/LightCull/LightCull/Views/Components/ThumbnailBarView.swift",
+  "tables": {
+    "Localizable": [
+      {
+        "comment": "",
+        "key": "Keine Bilder verfügbar",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 46
+        }
+      },
+      {
+        "comment": "",
+        "key": "Thumbnail-Leiste",
+        "location": {
+          "startingColumn": 22,
+          "startingLine": 41
+        }
+      },
+      {
+        "comment": "",
+        "key": "Thumbnail-Leiste",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 65
+        }
+      },
+      {
+        "comment": "",
+        "key": "%lld Bildpaare",
+        "location": {
+          "startingColumn": 18,
+          "startingLine": 71
+        }
+      },
+      {
+        "comment": "",
+        "key": "RAW✅",
+        "location": {
+          "startingColumn": 39,
+          "startingLine": 128
+        }
+      },
+      {
+        "comment": "",
+        "key": "RAW🚫",
+        "location": {
+          "startingColumn": 50,
+          "startingLine": 128
+        }
+      },
+      {
+        "comment": "",
+        "key": "Umbenennen...",
+        "location": {
+          "startingColumn": 20,
+          "startingLine": 178
+        }
+      }
+    ]
+  },
+  "version": 1
+}

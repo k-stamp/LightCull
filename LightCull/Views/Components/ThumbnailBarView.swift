@@ -94,7 +94,8 @@ struct ThumbnailBarView: View {
     // MARK: - Thumbnail Item
     private func thumbnailItem(for pair: ImagePair) -> some View {
         VStack(spacing: 6) {
-            AsyncImage(url: pair.jpegURL) { image in
+            // NEW: Use thumbnail URL if available, otherwise fall back to JPEG URL
+            AsyncImage(url: pair.thumbnailURL ?? pair.jpegURL) { image in
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fit)

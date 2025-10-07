@@ -10,6 +10,19 @@ import OSLog
 
 class FileDeleteService {
 
+    // MARK: - Dependencies
+
+    // Service for managing thumbnails
+    private let thumbnailService: ThumbnailService
+
+    // MARK: - Initializer
+
+    /// Initializes the FileDeleteService with a ThumbnailService
+    /// - Parameter thumbnailService: The service for managing thumbnails
+    init(thumbnailService: ThumbnailService = ThumbnailService()) {
+        self.thumbnailService = thumbnailService
+    }
+
     // MARK: - Public Methods
 
     /// Moves an ImagePair to the _toDelete folder
@@ -39,6 +52,14 @@ class FileDeleteService {
         }
 
         Logger.fileOps.info("JPEG moved: \(jpegFileName)")
+
+        // 2b. Move thumbnail (non-critical - don't abort if it fails)
+        let thumbnailMoved: Bool = thumbnailService.moveThumbnailToDeleteFolder(for: pair.jpegURL)
+        if thumbnailMoved {
+            Logger.fileOps.debug("Thumbnail moved to _toDelete")
+        } else {
+            Logger.fileOps.notice("Thumbnail could not be moved (non-critical)")
+        }
 
         // 3. Move RAW (if present)
         var newRawURL: URL? = nil
@@ -89,6 +110,14 @@ class FileDeleteService {
         }
 
         Logger.fileOps.info("JPEG restored: \(operation.originalJpegURL.lastPathComponent)")
+
+        // 1b. Restore thumbnail (non-critical - don't abort if it fails)
+        let thumbnailRestored: Bool = thumbnailService.moveThumbnailFromDeleteFolder(for: operation.originalJpegURL)
+        if thumbnailRestored {
+            Logger.fileOps.debug("Thumbnail restored from _toDelete")
+        } else {
+            Logger.fileOps.notice("Thumbnail could not be restored (non-critical)")
+        }
 
         // 2. Move RAW back (if present)
         if let deletedRawURL = operation.deletedRawURL {
