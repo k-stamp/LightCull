@@ -117,6 +117,20 @@ struct ThumbnailBarView: View {
                         lineWidth: getBorderWidth(for: pair)
                     )
             }
+            .overlay(alignment: .topTrailing) {
+                // Stern-Badge für TOP-getaggte Bilder
+                if pair.hasTopTag {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: 14))
+                        .foregroundStyle(.yellow)
+                        .padding(6)
+                        .background(
+                            Circle()
+                                .fill(.black.opacity(0.5))
+                                .blur(radius: 2)
+                        )
+                }
+            }
 
             // Filename without extension
             Text(pair.jpegURL.deletingPathExtension().lastPathComponent)
