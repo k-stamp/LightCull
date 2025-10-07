@@ -14,29 +14,49 @@ struct ThumbnailProgressView: View {
     var body: some View {
         VStack(spacing: 20) {
             // Title
-            Text("Thumbnails werden erstellt...")
+            Text(titleText)
                 .font(.headline)
 
-            // Progress information
-            Text("\(currentCount) von \(totalCount)")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
+            // Progress information or loading indicator
+            if totalCount == 0 {
+                // Still loading pairs from folder
+                ProgressView()
+                    .scaleEffect(0.8)
 
-            // Progress bar
-            ProgressView(value: Double(currentCount), total: Double(totalCount))
-                .progressViewStyle(.linear)
-                .frame(width: 300)
+                Text("Ordner wird eingelesen...")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            } else {
+                // Generating thumbnails
+                Text("\(currentCount) von \(totalCount)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
-            // Percentage display
-            Text("\(progressPercentage)%")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                // Progress bar
+                ProgressView(value: Double(currentCount), total: Double(totalCount))
+                    .progressViewStyle(.linear)
+                    .frame(width: 300)
+
+                // Percentage display
+                Text("\(progressPercentage)%")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
         }
         .padding(40)
         .frame(width: 400)
     }
 
     // MARK: - Computed Properties
+
+    /// Returns the appropriate title text based on the current state
+    private var titleText: String {
+        if totalCount == 0 {
+            return "Bilder werden geladen..."
+        } else {
+            return "Thumbnails werden erstellt..."
+        }
+    }
 
     /// Calculates the progress as a percentage
     private var progressPercentage: Int {

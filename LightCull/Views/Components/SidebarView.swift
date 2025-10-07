@@ -182,11 +182,9 @@ struct SidebarView: View {
         if panel.runModal() == .OK, let url = panel.url {
             folderURL = url
 
-            // IMPORTANT: Start Security-Scoped Access FIRST (in MainView)
+            // NEW: MainView will now handle BOTH security access AND loading pairs
+            // This prevents blocking the main thread
             onFolderSelected(url)
-
-            // THEN scan the files (requires the access to read tags)
-            pairs = fileService.findImagePairs(in: url)
         }
     }
 }
