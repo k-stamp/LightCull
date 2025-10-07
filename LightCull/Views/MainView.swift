@@ -25,6 +25,9 @@ struct MainView: View {
     // Metadata of the currently selected image
     @State private var currentMetadata: ImageMetadata?
 
+    // NEW: Folder statistics
+    @State private var folderStatistics: FolderStatistics?
+
     // Shared ViewModel for zoom control between viewer and toolbar
     @StateObject private var imageViewModel = ImageViewModel()
 
@@ -57,6 +60,7 @@ struct MainView: View {
                 folderURL: $folderURL,
                 pairs: $pairs,
                 currentMetadata: currentMetadata,
+                statistics: folderStatistics,
                 onFolderSelected: handleFolderSelection
             )
         } detail: {
@@ -270,8 +274,29 @@ struct MainView: View {
         selectedPair = nil
         selectedPair = updatedPair
 
-        // 4. Debug output
+        // 4. Update statistics (NEW!)
+        refreshStatistics()
+
+        // 5. Debug output
         Logger.ui.info("ImagePair updated: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
+    }
+
+    /// Refreshes the folder statistics
+    private func refreshStatistics() {
+        guard let folder = folderURL else {
+            return
+        }
+
+        // Reload statistics on background thread
+        Task.detached {
+            let fileService = await FileService(tagService: FinderTagService())
+            let stats = await fileService.getFolderStatistics(in: folder)
+
+            // Update on main thread
+            await MainActor.run {
+                folderStatistics = stats
+            }
+        }
     }
 
     // MARK: - Rename Handlers (NEW!)
@@ -494,22 +519,26 @@ struct MainView: View {
     private func loadPairsAndGenerateThumbnails(for folderURL: URL) async {
         Logger.ui.info("Loading pairs from folder: \(folderURL.path)")
 
-        // 1. Load pairs from folder (on background thread)
-        let loadedPairs: [ImagePair] = await Task.detached {
+        // 1. Load pairs and statistics from folder (on background thread)
+        let (loadedPairs, loadedStatistics) = await Task.detached {
             // Create FileService
             let fileService = await FileService(tagService: FinderTagService())
 
             // Find image pairs (this can take time for large folders)
             let pairs = await fileService.findImagePairs(in: folderURL)
 
+            // Get folder statistics
+            let stats = await fileService.getFolderStatistics(in: folderURL)
+
             await Logger.ui.info("Found \(pairs.count) image pairs")
-            return pairs
+            return (pairs, stats)
         }.value
 
-        // 2. Update pairs on main thread
+        // 2. Update pairs and statistics on main thread
         await MainActor.run {
             pairs = loadedPairs
             selectedPair = pairs.first
+            folderStatistics = loadedStatistics
 
             // Update progress to show total count
             thumbnailProgress = (current: 0, total: pairs.count)

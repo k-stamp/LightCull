@@ -10,10 +10,13 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var folderURL: URL?
     @Binding var pairs: [ImagePair]
-    
+
     // NEW: Metadata of the currently selected image
     let currentMetadata: ImageMetadata?
-    
+
+    // NEW: Folder statistics
+    let statistics: FolderStatistics?
+
     let onFolderSelected: (URL) -> Void
     
     private let fileService = FileService()
@@ -60,9 +63,10 @@ struct SidebarView: View {
                     Text("Selected Folder:")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text(folderURL.lastPathComponent)
+                    Text(folderURL.path)
                         .font(.subheadline)
-                        .lineLimit(1)
+                        .lineLimit(2)
+                        .textSelection(.enabled)  // Ermöglicht Kopieren des Pfads
                 }
                 .padding(.horizontal)
             }
@@ -72,21 +76,40 @@ struct SidebarView: View {
     // MARK: - Info Section
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Info")
+            Text("Statistics")
                 .font(.headline)
                 .padding(.horizontal)
-            
-            if pairs.isEmpty {
-                Text("No image pairs found")
+
+            if let stats = statistics {
+                VStack(alignment: .leading, spacing: 6) {
+                    statisticRow(label: "Dateien", value: "\(stats.totalFiles)")
+                    statisticRow(label: "JPEG + RAF", value: "\(stats.jpegWithRaw)")
+                    statisticRow(label: "JPEG ohne RAW", value: "\(stats.jpegWithoutRaw)")
+                    statisticRow(label: "Löschen", value: "\(stats.deletedFiles)")
+                    statisticRow(label: "TOP", value: "\(stats.topTaggedFiles)")
+                }
+            } else {
+                Text("No folder selected")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
-            } else {
-                Text("Pairs: \(pairs.count)")
-                    .font(.subheadline)
-                    .padding(.horizontal)
             }
         }
+    }
+
+    /// Helper function: Creates a row with label and value for statistics
+    private func statisticRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.medium)
+                .monospacedDigit()  // Verhindert Springen bei Zahlenänderung
+        }
+        .padding(.horizontal)
     }
     
     // MARK: - Metadata Section (NEW!)
@@ -196,6 +219,7 @@ struct SidebarView: View {
         folderURL: .constant(nil),
         pairs: .constant([]),
         currentMetadata: nil,
+        statistics: nil,
         onFolderSelected: { _ in }
     )
 }
@@ -216,6 +240,13 @@ struct SidebarView: View {
             )
         ]),
         currentMetadata: nil,
+        statistics: FolderStatistics(
+            totalFiles: 150,
+            jpegWithRaw: 75,
+            jpegWithoutRaw: 10,
+            deletedFiles: 5,
+            topTaggedFiles: 12
+        ),
         onFolderSelected: { _ in }
     )
 }
@@ -238,6 +269,13 @@ struct SidebarView: View {
             focalLength: "35.0 mm",
             aperture: "f/2.8",
             shutterSpeed: "1/250s"
+        ),
+        statistics: FolderStatistics(
+            totalFiles: 150,
+            jpegWithRaw: 75,
+            jpegWithoutRaw: 10,
+            deletedFiles: 5,
+            topTaggedFiles: 12
         ),
         onFolderSelected: { _ in }
     )
