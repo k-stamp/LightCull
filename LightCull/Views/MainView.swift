@@ -25,6 +25,9 @@ struct MainView: View {
     // Metadata of the currently selected image
     @State private var currentMetadata: ImageMetadata?
 
+    // NEW: Folder statistics
+    @State private var folderStatistics: FolderStatistics?
+
     // Shared ViewModel for zoom control between viewer and toolbar
     @StateObject private var imageViewModel = ImageViewModel()
 
@@ -57,6 +60,7 @@ struct MainView: View {
                 folderURL: $folderURL,
                 pairs: $pairs,
                 currentMetadata: currentMetadata,
+                statistics: folderStatistics,
                 onFolderSelected: handleFolderSelection
             )
         } detail: {
@@ -96,14 +100,17 @@ struct MainView: View {
             }
             // Toolbar at the top edge of the window
             .toolbar {
-                // NEW: Tag button on the left in the toolbar
-                ToolbarItem(placement: .navigation) {
-                    tagButtonView
-                }
-                
                 ToolbarItem(placement: .primaryAction) {
-                    // Zoom controls on the right in the toolbar
-                    zoomControlsView
+                    HStack(spacing: 12) {
+                        // Tag button on the left of zoom controls
+                        tagButtonView
+
+                        Divider()
+                            .frame(height: 20)
+
+                        // Zoom controls on the right
+                        zoomControlsView
+                    }
                 }
             }
         }
@@ -167,7 +174,7 @@ struct MainView: View {
             handleToggleTag()
         }) {
             Image(systemName: selectedPair?.hasTopTag == true ? "star.fill" : "star")
-                .imageScale(.medium)
+                .imageScale(.large)
                 .foregroundStyle(selectedPair?.hasTopTag == true ? .yellow : .primary)
         }
         .disabled(selectedPair == nil)
@@ -178,17 +185,17 @@ struct MainView: View {
     
     /// Zoom slider and buttons for the toolbar
     private var zoomControlsView: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 4) {
             // Zoom Out Button
             Button(action: {
                 imageViewModel.zoomOut()
             }) {
                 Image(systemName: "minus.magnifyingglass")
-                    .imageScale(.medium)
+                    .imageScale(.large)
             }
             .disabled(imageViewModel.isMinZoom)
             .help("Zoom out (⌘-)")
-            
+
             // Zoom slider with percentage display
             HStack(spacing: 8) {
                 // CORRECTION: Direct binding to @Published property
@@ -199,30 +206,30 @@ struct MainView: View {
                 )
                 .frame(width: 120)
                 .disabled(selectedPair == nil)
-                
+
                 Text("\(imageViewModel.zoomPercentage)%")
-                    .font(.caption)
+                    .font(.body)
                     .monospacedDigit() // Prevents digit jumping
-                    .frame(minWidth: 45, alignment: .trailing)
+                    .frame(minWidth: 50, alignment: .trailing)
                     .foregroundStyle(selectedPair == nil ? .secondary : .primary)
             }
-            
+
             // Zoom In Button
             Button(action: {
                 imageViewModel.zoomIn()
             }) {
                 Image(systemName: "plus.magnifyingglass")
-                    .imageScale(.medium)
+                    .imageScale(.large)
             }
             .disabled(imageViewModel.isMaxZoom)
             .help("Zoom in (⌘+)")
-            
+
             // Reset Zoom Button
             Button(action: {
                 imageViewModel.resetZoom()
             }) {
                 Image(systemName: "arrow.counterclockwise")
-                    .imageScale(.medium)
+                    .imageScale(.large)
             }
             .disabled(imageViewModel.isMinZoom)
             .help("Reset zoom (⌘0)")
@@ -267,8 +274,29 @@ struct MainView: View {
         selectedPair = nil
         selectedPair = updatedPair
 
-        // 4. Debug output
+        // 4. Update statistics (NEW!)
+        refreshStatistics()
+
+        // 5. Debug output
         Logger.ui.info("ImagePair updated: \(updatedPair.jpegURL.lastPathComponent) - hasTopTag: \(updatedPair.hasTopTag)")
+    }
+
+    /// Refreshes the folder statistics
+    private func refreshStatistics() {
+        guard let folder = folderURL else {
+            return
+        }
+
+        // Reload statistics on background thread
+        Task.detached {
+            let fileService = await FileService(tagService: FinderTagService())
+            let stats = await fileService.getFolderStatistics(in: folder)
+
+            // Update on main thread
+            await MainActor.run {
+                folderStatistics = stats
+            }
+        }
     }
 
     // MARK: - Rename Handlers (NEW!)
@@ -333,7 +361,10 @@ struct MainView: View {
     }
 
     /// Rescans the folder and updates the pairs
-    private func rescanFolder(_ folder: URL) {
+    /// - Parameters:
+    ///   - folder: The folder to rescan
+    ///   - completion: Optional callback after rescan completes (on main thread)
+    private func rescanFolder(_ folder: URL, completion: (() -> Void)? = nil) {
         // Show progress sheet
         isGeneratingThumbnails = true
         thumbnailProgress = (current: 0, total: 0)
@@ -341,6 +372,11 @@ struct MainView: View {
         // Rescan asynchronously (to prevent blocking main thread)
         Task {
             await loadPairsAndGenerateThumbnails(for: folder)
+
+            // After rescan, call completion on main thread
+            await MainActor.run {
+                completion?()
+            }
         }
     }
 
@@ -373,11 +409,11 @@ struct MainView: View {
                 // Delete was successful!
                 Logger.ui.info("Delete successful")
 
-                // 5. Rescan folder (so the deleted image disappears)
-                rescanFolder(folder)
-
-                // 6. Select next image
-                selectNextImageAfterDelete(deletedIndex: currentIndex)
+                // 5. Rescan folder, then select next image in completion
+                rescanFolder(folder) {
+                    // 6. Select next image AFTER rescan completes
+                    selectNextImageAfterDelete(deletedIndex: currentIndex)
+                }
             } else {
                 // Delete failed
                 Logger.ui.error("Delete failed")
@@ -484,6 +520,11 @@ struct MainView: View {
         // This prevents blocking the main thread
         Task {
             await loadPairsAndGenerateThumbnails(for: url)
+
+            // After loading, select first image
+            await MainActor.run {
+                selectedPair = pairs.first
+            }
         }
     }
 
@@ -491,22 +532,26 @@ struct MainView: View {
     private func loadPairsAndGenerateThumbnails(for folderURL: URL) async {
         Logger.ui.info("Loading pairs from folder: \(folderURL.path)")
 
-        // 1. Load pairs from folder (on background thread)
-        let loadedPairs: [ImagePair] = await Task.detached {
+        // 1. Load pairs and statistics from folder (on background thread)
+        let (loadedPairs, loadedStatistics) = await Task.detached {
             // Create FileService
             let fileService = await FileService(tagService: FinderTagService())
 
             // Find image pairs (this can take time for large folders)
             let pairs = await fileService.findImagePairs(in: folderURL)
 
+            // Get folder statistics
+            let stats = await fileService.getFolderStatistics(in: folderURL)
+
             await Logger.ui.info("Found \(pairs.count) image pairs")
-            return pairs
+            return (pairs, stats)
         }.value
 
-        // 2. Update pairs on main thread
+        // 2. Update pairs and statistics on main thread
         await MainActor.run {
             pairs = loadedPairs
-            selectedPair = pairs.first
+            // NOTE: selectedPair is NOT set here - caller is responsible for selection
+            folderStatistics = loadedStatistics
 
             // Update progress to show total count
             thumbnailProgress = (current: 0, total: pairs.count)

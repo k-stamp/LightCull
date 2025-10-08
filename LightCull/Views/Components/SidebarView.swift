@@ -10,10 +10,13 @@ import SwiftUI
 struct SidebarView: View {
     @Binding var folderURL: URL?
     @Binding var pairs: [ImagePair]
-    
+
     // NEW: Metadata of the currently selected image
     let currentMetadata: ImageMetadata?
-    
+
+    // NEW: Folder statistics
+    let statistics: FolderStatistics?
+
     let onFolderSelected: (URL) -> Void
     
     private let fileService = FileService()
@@ -21,7 +24,7 @@ struct SidebarView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             Text("LightCull")
-                .font(.title2)
+                .font(.title)
                 .fontWeight(.bold)
                 .padding(.horizontal)
             
@@ -47,7 +50,8 @@ struct SidebarView: View {
     private var folderSelectionSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Folder")
-                .font(.headline)
+                .font(.title3)
+                .fontWeight(.semibold)
                 .padding(.horizontal)
 
             Button("Select Folder") {
@@ -58,11 +62,12 @@ struct SidebarView: View {
             if let folderURL {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Selected Folder:")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    Text(folderURL.lastPathComponent)
                         .font(.subheadline)
-                        .lineLimit(1)
+                        .foregroundStyle(.secondary)
+                    Text(folderURL.path)
+                        .font(.body)
+                        .lineLimit(2)
+                        .textSelection(.enabled)  // Ermöglicht Kopieren des Pfads
                 }
                 .padding(.horizontal)
             }
@@ -72,21 +77,41 @@ struct SidebarView: View {
     // MARK: - Info Section
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Info")
-                .font(.headline)
+            Text("Statistics")
+                .font(.title3)
+                .fontWeight(.semibold)
                 .padding(.horizontal)
-            
-            if pairs.isEmpty {
-                Text("No image pairs found")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .padding(.horizontal)
+
+            if let stats = statistics {
+                VStack(alignment: .leading, spacing: 6) {
+                    statisticRow(label: "Dateien", value: "\(stats.totalFiles)")
+                    statisticRow(label: "JPEG + RAF", value: "\(stats.jpegWithRaw)")
+                    statisticRow(label: "JPEG ohne RAW", value: "\(stats.jpegWithoutRaw)")
+                    statisticRow(label: "Löschen", value: "\(stats.deletedFiles)")
+                    statisticRow(label: "TOP", value: "\(stats.topTaggedFiles)")
+                }
             } else {
-                Text("Pairs: \(pairs.count)")
+                Text("No folder selected")
                     .font(.subheadline)
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal)
             }
         }
+    }
+
+    /// Helper function: Creates a row with label and value for statistics
+    private func statisticRow(label: String, value: String) -> some View {
+        HStack {
+            Text(label)
+                .font(.body)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .font(.body)
+                .fontWeight(.medium)
+                .monospacedDigit()  // Verhindert Springen bei Zahlenänderung
+        }
+        .padding(.horizontal)
     }
     
     // MARK: - Metadata Section (NEW!)
@@ -95,7 +120,8 @@ struct SidebarView: View {
     private var metadataSection: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Image Information")
-                .font(.headline)
+                .font(.title3)
+                .fontWeight(.semibold)
                 .padding(.horizontal)
 
             // If metadata is available, display it
@@ -138,7 +164,7 @@ struct SidebarView: View {
             } else {
                 // If no metadata is available, show placeholder
                 Text("No image selected")
-                    .font(.caption)
+                    .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .padding(.horizontal)
             }
@@ -150,11 +176,11 @@ struct SidebarView: View {
     private func metadataRow(label: String, value: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(label)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            
-            Text(value)
                 .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            Text(value)
+                .font(.body)
                 .textSelection(.enabled) // Enables copying the value
         }
         .padding(.horizontal)
@@ -196,6 +222,7 @@ struct SidebarView: View {
         folderURL: .constant(nil),
         pairs: .constant([]),
         currentMetadata: nil,
+        statistics: nil,
         onFolderSelected: { _ in }
     )
 }
@@ -216,6 +243,13 @@ struct SidebarView: View {
             )
         ]),
         currentMetadata: nil,
+        statistics: FolderStatistics(
+            totalFiles: 150,
+            jpegWithRaw: 75,
+            jpegWithoutRaw: 10,
+            deletedFiles: 5,
+            topTaggedFiles: 12
+        ),
         onFolderSelected: { _ in }
     )
 }
@@ -238,6 +272,13 @@ struct SidebarView: View {
             focalLength: "35.0 mm",
             aperture: "f/2.8",
             shutterSpeed: "1/250s"
+        ),
+        statistics: FolderStatistics(
+            totalFiles: 150,
+            jpegWithRaw: 75,
+            jpegWithoutRaw: 10,
+            deletedFiles: 5,
+            topTaggedFiles: 12
         ),
         onFolderSelected: { _ in }
     )
