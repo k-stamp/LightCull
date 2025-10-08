@@ -24,12 +24,6 @@ struct ImageViewerView: View {
     // NEW: Callback for delete
     let onDeleteImage: () -> Void
 
-    // State for magnification gesture
-    @GestureState private var magnificationState: CGFloat = 1.0
-
-    // State for drag gesture (temporary displacement during dragging)
-    @GestureState private var dragState: CGSize = .zero
-    
     var body: some View {
         ZStack {
             // Main content
@@ -111,69 +105,45 @@ struct ImageViewerView: View {
 
     /// The loaded image with zoom and pan gesture functionality
     private func zoomableImageView(image: Image, availableSize: CGSize) -> some View {
-        image
-            .resizable()
-            .aspectRatio(contentMode: .fit)
-            .frame(maxWidth: availableSize.width, maxHeight: availableSize.height)
-            // Apply zoom
-            .scaleEffect(viewModel.zoomScale * magnificationState)
-            // Position: stored offset + temporary drag
-            .offset(
-                x: viewModel.imageOffset.width + dragState.width,
-                y: viewModel.imageOffset.height + dragState.height
-            )
-            .position(x: availableSize.width / 2, y: availableSize.height / 2)
-            // Adjust pan bounds when image loads (to handle different aspect ratios)
-            .onAppear {
-                viewModel.adjustPanBounds(imageSize: availableSize, viewSize: availableSize)
-            }
-            // Combined gestures: Magnification AND drag simultaneously
-            .gesture(
-                // SimultaneousGesture allows both gestures at the same time
-                SimultaneousGesture(
-                    // Magnification gesture for trackpad zoom
-                    MagnificationGesture()
-                        .updating($magnificationState) { currentState, gestureState, _ in
-                            // During gesture: temporary scaling
-                            gestureState = currentState
-                        }
-                        .onEnded { finalMagnification in
-                            // At end of gesture: apply final scaling
-                            viewModel.handleMagnification(finalMagnification)
-                        },
-
-
-                    // Drag gesture for panning with 2 fingers (WITHOUT clicking!)
-                    // minimumDistance: 0 means: no click required!
-                    DragGesture(minimumDistance: 0)
-                        .updating($dragState) { value, gestureState, _ in
-                            // Only pan when zoomed
-                            guard viewModel.isPanEnabled else { return }
-
-                            // During gesture: temporary displacement
-                            gestureState = value.translation
-                        }
-                        .onEnded { value in
-                            // Only process when zoomed
-                            guard viewModel.isPanEnabled else { return }
-
-                            // Calculate and apply final position
-                            let newOffset = CGSize(
-                                width: viewModel.imageOffset.width + value.translation.width,
-                                height: viewModel.imageOffset.height + value.translation.height
-                            )
-
-                            // With bounds checking
-                            viewModel.handleDrag(
-                                translation: newOffset,
-                                imageSize: availableSize,
-                                viewSize: availableSize
-                            )
-
-                            viewModel.endDrag()
-                        }
+        ZStack {
+            // Das eigentliche Bild mit Zoom
+            image
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(maxWidth: availableSize.width, maxHeight: availableSize.height)
+                // Apply zoom (nur noch viewModel.zoomScale, kein magnificationState mehr)
+                .scaleEffect(viewModel.zoomScale)
+                // Position: nur noch stored offset (kein dragState mehr)
+                .offset(
+                    x: viewModel.imageOffset.width,
+                    y: viewModel.imageOffset.height
                 )
-            )
+                .position(x: availableSize.width / 2, y: availableSize.height / 2)
+                // Adjust pan bounds when image loads (to handle different aspect ratios)
+                .onAppear {
+                    viewModel.adjustPanBounds(imageSize: availableSize, viewSize: availableSize)
+                }
+
+            // Overlay für kombinierte Zoom- und Pan-Gesten
+            // Immer aktiv, damit Zoom jederzeit funktioniert
+            ZoomAndPanGestureView { magnification in
+                // Bei jedem Magnify-Event: Zoom anpassen
+                viewModel.handleMagnification(magnification)
+            } onScrollDelta: { deltaX, deltaY in
+                // Bei jedem Scroll-Event: Delta auf aktuelle Position anwenden
+                // (wird im ViewModel ignoriert wenn nicht gezoomt)
+                viewModel.applyScrollDelta(
+                    deltaX: deltaX,
+                    deltaY: deltaY,
+                    imageSize: availableSize,
+                    viewSize: availableSize
+                )
+            }
+            // WICHTIG: Frame muss gesetzt werden, damit das View Events empfangen kann!
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Allow the view to receive mouse/trackpad events
+            .allowsHitTesting(true)
+        }
     }
     
     // MARK: - State Views
