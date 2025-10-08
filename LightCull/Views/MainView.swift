@@ -361,7 +361,10 @@ struct MainView: View {
     }
 
     /// Rescans the folder and updates the pairs
-    private func rescanFolder(_ folder: URL) {
+    /// - Parameters:
+    ///   - folder: The folder to rescan
+    ///   - completion: Optional callback after rescan completes (on main thread)
+    private func rescanFolder(_ folder: URL, completion: (() -> Void)? = nil) {
         // Show progress sheet
         isGeneratingThumbnails = true
         thumbnailProgress = (current: 0, total: 0)
@@ -369,6 +372,11 @@ struct MainView: View {
         // Rescan asynchronously (to prevent blocking main thread)
         Task {
             await loadPairsAndGenerateThumbnails(for: folder)
+
+            // After rescan, call completion on main thread
+            await MainActor.run {
+                completion?()
+            }
         }
     }
 
@@ -401,11 +409,11 @@ struct MainView: View {
                 // Delete was successful!
                 Logger.ui.info("Delete successful")
 
-                // 5. Rescan folder (so the deleted image disappears)
-                rescanFolder(folder)
-
-                // 6. Select next image
-                selectNextImageAfterDelete(deletedIndex: currentIndex)
+                // 5. Rescan folder, then select next image in completion
+                rescanFolder(folder) {
+                    // 6. Select next image AFTER rescan completes
+                    selectNextImageAfterDelete(deletedIndex: currentIndex)
+                }
             } else {
                 // Delete failed
                 Logger.ui.error("Delete failed")
@@ -512,6 +520,11 @@ struct MainView: View {
         // This prevents blocking the main thread
         Task {
             await loadPairsAndGenerateThumbnails(for: url)
+
+            // After loading, select first image
+            await MainActor.run {
+                selectedPair = pairs.first
+            }
         }
     }
 
@@ -537,7 +550,7 @@ struct MainView: View {
         // 2. Update pairs and statistics on main thread
         await MainActor.run {
             pairs = loadedPairs
-            selectedPair = pairs.first
+            // NOTE: selectedPair is NOT set here - caller is responsible for selection
             folderStatistics = loadedStatistics
 
             // Update progress to show total count
