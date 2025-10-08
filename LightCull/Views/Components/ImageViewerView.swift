@@ -24,9 +24,6 @@ struct ImageViewerView: View {
     // NEW: Callback for delete
     let onDeleteImage: () -> Void
 
-    // State for magnification gesture
-    @GestureState private var magnificationState: CGFloat = 1.0
-    
     var body: some View {
         ZStack {
             // Main content
@@ -114,8 +111,8 @@ struct ImageViewerView: View {
                 .resizable()
                 .aspectRatio(contentMode: .fit)
                 .frame(maxWidth: availableSize.width, maxHeight: availableSize.height)
-                // Apply zoom
-                .scaleEffect(viewModel.zoomScale * magnificationState)
+                // Apply zoom (nur noch viewModel.zoomScale, kein magnificationState mehr)
+                .scaleEffect(viewModel.zoomScale)
                 // Position: nur noch stored offset (kein dragState mehr)
                 .offset(
                     x: viewModel.imageOffset.width,
@@ -126,35 +123,26 @@ struct ImageViewerView: View {
                 .onAppear {
                     viewModel.adjustPanBounds(imageSize: availableSize, viewSize: availableSize)
                 }
-                // Nur noch Magnification gesture (Zoom)
-                .gesture(
-                    MagnificationGesture()
-                        .updating($magnificationState) { currentState, gestureState, _ in
-                            // During gesture: temporary scaling
-                            gestureState = currentState
-                        }
-                        .onEnded { finalMagnification in
-                            // At end of gesture: apply final scaling
-                            viewModel.handleMagnification(finalMagnification)
-                        }
-                )
 
-            // Overlay für Zwei-Finger-Scroll-Geste (nur wenn gezoomt)
-            if viewModel.isPanEnabled {
-                PanGestureView { deltaX, deltaY in
-                    // Bei jedem Scroll-Event: Delta auf aktuelle Position anwenden
-                    viewModel.applyScrollDelta(
-                        deltaX: deltaX,
-                        deltaY: deltaY,
-                        imageSize: availableSize,
-                        viewSize: availableSize
-                    )
-                }
-                // WICHTIG: Frame muss gesetzt werden, damit das View Events empfangen kann!
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-                // Allow the view to receive mouse/trackpad events
-                .allowsHitTesting(true)
+            // Overlay für kombinierte Zoom- und Pan-Gesten
+            // Immer aktiv, damit Zoom jederzeit funktioniert
+            ZoomAndPanGestureView { magnification in
+                // Bei jedem Magnify-Event: Zoom anpassen
+                viewModel.handleMagnification(magnification)
+            } onScrollDelta: { deltaX, deltaY in
+                // Bei jedem Scroll-Event: Delta auf aktuelle Position anwenden
+                // (wird im ViewModel ignoriert wenn nicht gezoomt)
+                viewModel.applyScrollDelta(
+                    deltaX: deltaX,
+                    deltaY: deltaY,
+                    imageSize: availableSize,
+                    viewSize: availableSize
+                )
             }
+            // WICHTIG: Frame muss gesetzt werden, damit das View Events empfangen kann!
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Allow the view to receive mouse/trackpad events
+            .allowsHitTesting(true)
         }
     }
     
