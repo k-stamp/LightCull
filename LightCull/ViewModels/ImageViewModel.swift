@@ -115,7 +115,41 @@ class ImageViewModel: ObservableObject {
     }
     
     // MARK: - Pan Actions
-    
+
+    /// Applies a scroll delta to the current image offset (for scrollWheel events)
+    /// - Parameters:
+    ///   - deltaX: Horizontal scroll delta
+    ///   - deltaY: Vertical scroll delta
+    ///   - imageSize: The size of the image (for boundary calculation)
+    ///   - viewSize: The size of the view area
+    func applyScrollDelta(deltaX: CGFloat, deltaY: CGFloat, imageSize: CGSize, viewSize: CGSize) {
+        // Only allow pan when zoomed
+        guard zoomScale > minZoom else {
+            imageOffset = .zero
+            return
+        }
+
+        // Apply delta to current offset
+        let newOffset = CGSize(
+            width: imageOffset.width + deltaX,
+            height: imageOffset.height + deltaY
+        )
+
+        // Calculate boundaries based on zoom level
+        let scaledImageWidth = imageSize.width * zoomScale
+        let scaledImageHeight = imageSize.height * zoomScale
+
+        // Maximum translation in both directions
+        let maxOffsetX = max(0, (scaledImageWidth - viewSize.width) / 2)
+        let maxOffsetY = max(0, (scaledImageHeight - viewSize.height) / 2)
+
+        // Limit the offset to the calculated maximum values
+        let clampedX = min(max(newOffset.width, -maxOffsetX), maxOffsetX)
+        let clampedY = min(max(newOffset.height, -maxOffsetY), maxOffsetY)
+
+        imageOffset = CGSize(width: clampedX, height: clampedY)
+    }
+
     /// Handles drag gestures to move the zoomed image
     /// - Parameters:
     ///   - translation: The translation in pixels
