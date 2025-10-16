@@ -62,6 +62,8 @@ struct SidebarView: View {
             Button("Select Folder") {
                 selectFolder()
             }
+            .buttonStyle(.borderedProminent)
+            .tint(.blue)
             .padding(.horizontal)
             
             if let folderURL {
