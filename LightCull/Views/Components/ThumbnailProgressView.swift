@@ -28,14 +28,14 @@ struct ThumbnailProgressView: View {
                     .foregroundStyle(.secondary)
             } else {
                 // Generating thumbnails
-                Text("\(currentCount) von \(totalCount)")
+                Text("\(currentCount) / \(totalCount) Thumbnails erstellt")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
 
                 // Progress bar
                 ProgressView(value: Double(currentCount), total: Double(totalCount))
                     .progressViewStyle(.linear)
-                    .frame(width: 300)
+                    .frame(width: 400)
 
                 // Percentage display
                 Text("\(progressPercentage)%")

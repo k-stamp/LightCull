@@ -74,7 +74,9 @@ struct MainView: View {
                         onPreviousImage: selectPreviousImage,
                         onNextImage: selectNextImage,
                         onToggleTag: handleToggleTag,  // NEW: Callback for tag toggle
-                        onDeleteImage: handleDelete  // NEW: Callback for delete
+                        onDeleteImage: handleDelete,  // NEW: Callback for delete
+                        onArchiveImage: handleArchive,  // NEW: Callback for archive
+                        onOuttakeImage: handleOuttake  // NEW: Callback for outtake
                     )
 
                     ThumbnailBarView(
@@ -122,10 +124,10 @@ struct MainView: View {
         .onDisappear {
             stopSecurityScopedAccess()
         }
-        // NEW: Clear delete history when folder changes
+        // NEW: Clear move history when folder changes
         .onChange(of: folderURL) { oldValue, newValue in
-            // Clear the delete history when folder changes
-            imageViewModel.clearDeleteHistory()
+            // Clear the move history when folder changes
+            imageViewModel.clearMoveHistory()
         }
         // NEW: Show rename sheet
         .sheet(isPresented: $showRenameSheet) {
@@ -421,6 +423,84 @@ struct MainView: View {
         }
     }
 
+    /// Called when the "A" shortcut is pressed
+    private func handleArchive() {
+        // 1. Is there even a selected image?
+        guard let currentPair = selectedPair else {
+            Logger.ui.notice("No image selected - cannot archive")
+            return
+        }
+
+        // 2. Is there a selected folder?
+        guard let folder = folderURL else {
+            Logger.ui.notice("No folder selected - cannot archive")
+            return
+        }
+
+        // 3. Remember the index of the current image (for navigation after archive)
+        let currentIndex: Int? = pairs.firstIndex(of: currentPair)
+
+        Logger.ui.debug("Archiving image: \(currentPair.jpegURL.lastPathComponent)")
+
+        // 4. Call ViewModel to archive the image
+        imageViewModel.archiveImagePair(pair: currentPair, in: folder) { success in
+            // Callback is called when archive is finished
+
+            if success {
+                // Archive was successful!
+                Logger.ui.info("Archive successful")
+
+                // 5. Rescan folder, then select next image in completion
+                rescanFolder(folder) {
+                    // 6. Select next image AFTER rescan completes
+                    selectNextImageAfterDelete(deletedIndex: currentIndex)
+                }
+            } else {
+                // Archive failed
+                Logger.ui.error("Archive failed")
+            }
+        }
+    }
+
+    /// Called when the "O" shortcut is pressed
+    private func handleOuttake() {
+        // 1. Is there even a selected image?
+        guard let currentPair = selectedPair else {
+            Logger.ui.notice("No image selected - cannot outtake")
+            return
+        }
+
+        // 2. Is there a selected folder?
+        guard let folder = folderURL else {
+            Logger.ui.notice("No folder selected - cannot outtake")
+            return
+        }
+
+        // 3. Remember the index of the current image (for navigation after outtake)
+        let currentIndex: Int? = pairs.firstIndex(of: currentPair)
+
+        Logger.ui.debug("Outtaking image: \(currentPair.jpegURL.lastPathComponent)")
+
+        // 4. Call ViewModel to outtake the image
+        imageViewModel.outtakeImagePair(pair: currentPair, in: folder) { success in
+            // Callback is called when outtake is finished
+
+            if success {
+                // Outtake was successful!
+                Logger.ui.info("Outtake successful")
+
+                // 5. Rescan folder, then select next image in completion
+                rescanFolder(folder) {
+                    // 6. Select next image AFTER rescan completes
+                    selectNextImageAfterDelete(deletedIndex: currentIndex)
+                }
+            } else {
+                // Outtake failed
+                Logger.ui.error("Outtake failed")
+            }
+        }
+    }
+
     /// Called when the "CMD+Z" shortcut is pressed
     private func handleUndo() {
         // 1. Is there even anything to undo?
@@ -437,10 +517,10 @@ struct MainView: View {
             return
         }
 
-        Logger.ui.debug("Undoing last deletion")
+        Logger.ui.debug("Undoing last move")
 
         // 3. Call ViewModel to execute the undo
-        imageViewModel.undoLastDelete { success in
+        imageViewModel.undoLastMove { success in
             // Callback is called when undo is finished
 
             if success {
@@ -583,11 +663,9 @@ struct MainView: View {
 
         // 2. Generate thumbnails (with progress callback)
         let updatedPairs: [ImagePair] = await thumbnailService.generateThumbnails(for: pairs) { current, total in
-            // This callback is called for each thumbnail
-            // We need to update the UI on the main thread
-            Task { @MainActor in
-                thumbnailProgress = (current: current, total: total)
-            }
+            // This callback is already executed on MainActor (synchronously)
+            // No Task wrapper needed - UI updates happen immediately
+            thumbnailProgress = (current: current, total: total)
         }
 
         // 3. Update pairs array with thumbnail URLs

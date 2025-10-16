@@ -24,6 +24,12 @@ struct ImageViewerView: View {
     // NEW: Callback for delete
     let onDeleteImage: () -> Void
 
+    // NEW: Callback for archive
+    let onArchiveImage: () -> Void
+
+    // NEW: Callback for outtake
+    let onOuttakeImage: () -> Void
+
     var body: some View {
         ZStack {
             // Main content
@@ -69,6 +75,16 @@ struct ImageViewerView: View {
                 // NEW: Keyboard shortcut for delete
                 Button("Delete Image") { onDeleteImage() }
                     .keyboardShortcut("d", modifiers: [])
+                    .hidden()
+
+                // NEW: Keyboard shortcut for archive
+                Button("Archive Image") { onArchiveImage() }
+                    .keyboardShortcut("a", modifiers: [])
+                    .hidden()
+
+                // NEW: Keyboard shortcut for outtake
+                Button("Outtake Image") { onOuttakeImage() }
+                    .keyboardShortcut("o", modifiers: [])
                     .hidden()
             }
             .frame(width: 0, height: 0)
@@ -219,7 +235,9 @@ struct ImageViewerView: View {
         onPreviousImage: {},
         onNextImage: {},
         onToggleTag: {},
-        onDeleteImage: {}
+        onDeleteImage: {},
+        onArchiveImage: {},
+        onOuttakeImage: {}
     )
     .frame(width: 800, height: 600)
 }
@@ -235,7 +253,9 @@ struct ImageViewerView: View {
         onPreviousImage: {},
         onNextImage: {},
         onToggleTag: {},
-        onDeleteImage: {}
+        onDeleteImage: {},
+        onArchiveImage: {},
+        onOuttakeImage: {}
     )
     .frame(width: 800, height: 600)
 }

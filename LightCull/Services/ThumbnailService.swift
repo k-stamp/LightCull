@@ -111,9 +111,9 @@ class ThumbnailService {
     /// Generates thumbnails for an array of ImagePairs
     /// - Parameters:
     ///   - pairs: The ImagePairs to generate thumbnails for
-    ///   - progress: Callback for progress updates (current, total)
+    ///   - progress: Callback for progress updates (current, total) - executed on MainActor
     /// - Returns: Updated ImagePairs with thumbnailURL property set
-    func generateThumbnails(for pairs: [ImagePair], progress: @escaping (Int, Int) -> Void) async -> [ImagePair] {
+    func generateThumbnails(for pairs: [ImagePair], progress: @escaping @MainActor (Int, Int) -> Void) async -> [ImagePair] {
         // 1. Ensure cache directory exists
         let cacheReady: Bool = ensureCacheDirectoryExists()
         if cacheReady == false {
