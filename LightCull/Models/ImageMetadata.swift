@@ -22,6 +22,7 @@ struct ImageMetadata {
     let focalLength: String?
     let aperture: String?
     let shutterSpeed: String?
+    let iso: String?
 }
 
 // MARK: - Convenience Initializer
@@ -40,5 +41,6 @@ extension ImageMetadata {
         self.focalLength = nil
         self.aperture = nil
         self.shutterSpeed = nil
+        self.iso = nil
     }
 }
