@@ -26,7 +26,7 @@ class ThumbnailService {
 
     /// Returns the URL of the cache directory
     /// Example: ~/Library/Caches/LightCull/current/
-    private func getCacheDirectoryURL() -> URL {
+    nonisolated private func getCacheDirectoryURL() -> URL {
         let fileManager = FileManager.default
 
         // Get the system cache directory
@@ -93,7 +93,7 @@ class ThumbnailService {
 
     /// Returns the thumbnail URL for a given original file URL
     /// Example: /original/DSCF1234.JPG → ~/Library/Caches/LightCull/current/DSCF1234.jpg
-    func getThumbnailURL(for originalURL: URL) -> URL {
+    nonisolated func getThumbnailURL(for originalURL: URL) -> URL {
         let cacheDirectory: URL = getCacheDirectoryURL()
 
         // Get the filename from the original URL
@@ -114,43 +114,67 @@ class ThumbnailService {
     ///   - progress: Callback for progress updates (current, total) - executed on MainActor
     /// - Returns: Updated ImagePairs with thumbnailURL property set
     func generateThumbnails(for pairs: [ImagePair], progress: @escaping @MainActor (Int, Int) -> Void) async -> [ImagePair] {
-        // 1. Ensure cache directory exists
+        // 1. Start time measurement
+        let startTime: CFAbsoluteTime = CFAbsoluteTimeGetCurrent()
+        Logger.fileOps.info("⏱️ Starting thumbnail generation for \(pairs.count) pairs...")
+
+        // 2. Ensure cache directory exists
         let cacheReady: Bool = ensureCacheDirectoryExists()
         if cacheReady == false {
             Logger.fileOps.error("Cache directory could not be created - returning original pairs")
             return pairs
         }
 
-        // 2. Create array for updated pairs
-        var updatedPairs: [ImagePair] = []
-
         // 3. Total count for progress
         let totalCount: Int = pairs.count
 
-        // 4. Loop through all pairs
-        for index in 0..<pairs.count {
-            let pair: ImagePair = pairs[index]
+        // 4. Create dictionary to store results (key = index, value = updated pair)
+        var resultsDict: [Int: ImagePair] = [:]
 
-            // Report progress
-            let currentCount: Int = index + 1
-            progress(currentCount, totalCount)
+        // 5. Use TaskGroup for parallel thumbnail generation
+        await withTaskGroup(of: (Int, ImagePair, URL?).self) { group in
+            // Start all tasks in parallel
+            for (index, pair) in pairs.enumerated() {
+                group.addTask {
+                    // Generate thumbnail for this pair (on background thread)
+                    let thumbnailURL: URL? = self.generateThumbnail(for: pair.jpegURL)
+                    return (index, pair, thumbnailURL)
+                }
+            }
 
-            // Generate thumbnail for this pair
-            let thumbnailURL: URL? = generateThumbnail(for: pair.jpegURL)
+            // Collect results as they complete
+            var completedCount: Int = 0
+            for await (index, pair, thumbnailURL) in group {
+                completedCount += 1
 
-            // Create updated pair with thumbnail URL
-            let updatedPair = ImagePair(
-                jpegURL: pair.jpegURL,
-                rawURL: pair.rawURL,
-                hasTopTag: pair.hasTopTag,
-                thumbnailURL: thumbnailURL
-            )
+                // Report progress on main thread
+                await MainActor.run {
+                    progress(completedCount, totalCount)
+                }
 
-            // Add to result array
-            updatedPairs.append(updatedPair)
+                // Create updated pair with thumbnail URL
+                let updatedPair = ImagePair(
+                    jpegURL: pair.jpegURL,
+                    rawURL: pair.rawURL,
+                    hasTopTag: pair.hasTopTag,
+                    thumbnailURL: thumbnailURL
+                )
+
+                // Store in dictionary
+                resultsDict[index] = updatedPair
+            }
         }
 
-        Logger.fileOps.info("Thumbnail generation complete: \(updatedPairs.count) thumbnails")
+        // 6. Sort results by index and convert to array
+        let updatedPairs: [ImagePair] = resultsDict.sorted(by: { $0.key < $1.key }).map { $0.value }
+
+        // 7. End time measurement and log results
+        let endTime: CFAbsoluteTime = CFAbsoluteTimeGetCurrent()
+        let totalTime: Double = endTime - startTime
+        let avgTimePerThumbnail: Double = totalTime / Double(pairs.count)
+
+        Logger.fileOps.info("✅ Thumbnail generation complete: \(updatedPairs.count) thumbnails")
+        Logger.fileOps.info("⏱️ Total time: \(String(format: "%.2f", totalTime))s | Avg per thumbnail: \(String(format: "%.0f", avgTimePerThumbnail * 1000))ms")
 
         return updatedPairs
     }
@@ -158,7 +182,8 @@ class ThumbnailService {
     /// Generates a single thumbnail for a JPEG file
     /// - Parameter jpegURL: The URL of the JPEG file
     /// - Returns: The URL of the generated thumbnail, or nil on error
-    private func generateThumbnail(for jpegURL: URL) -> URL? {
+    /// - Note: This method is nonisolated to allow parallel execution from TaskGroup
+    nonisolated private func generateThumbnail(for jpegURL: URL) -> URL? {
         // 1. Get the thumbnail URL
         let thumbnailURL: URL = getThumbnailURL(for: jpegURL)
 
@@ -176,9 +201,11 @@ class ThumbnailService {
         }
 
         // 4. Create thumbnail options
+        // PERFORMANCE OPTIMIZATION: Try to use embedded EXIF thumbnail first (10-50x faster!)
+        // If no embedded thumbnail exists, CGImageSource will generate one automatically
         let options: [CFString: Any] = [
             kCGImageSourceCreateThumbnailWithTransform: true,  // Respect EXIF orientation
-            kCGImageSourceCreateThumbnailFromImageAlways: true,  // Always create thumbnail
+            kCGImageSourceCreateThumbnailFromImageAlways: false,  // Use embedded thumbnail if available
             kCGImageSourceThumbnailMaxPixelSize: thumbnailSize  // Max size: 200px
         ]
 
@@ -206,7 +233,7 @@ class ThumbnailService {
     ///   - image: The CGImage to save
     ///   - url: The destination URL
     /// - Returns: true on success, false on error
-    private func saveThumbnailAsJPEG(image: CGImage, to url: URL) -> Bool {
+    nonisolated private func saveThumbnailAsJPEG(image: CGImage, to url: URL) -> Bool {
         // 1. Create CGImageDestination for JPEG
         guard let destination = CGImageDestinationCreateWithURL(url as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
             Logger.fileOps.error("Could not create image destination")

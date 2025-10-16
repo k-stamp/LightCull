@@ -80,7 +80,7 @@ struct ThumbnailBarView: View {
                             .scaleEffect(0.5)
                     }
             }
-            .frame(maxWidth: 100, maxHeight: 100)
+            .frame(width: 100, height: 100)
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay {
                 // Border logic: Blue when multi-selected, accent when single-selected
@@ -114,6 +114,7 @@ struct ThumbnailBarView: View {
             // RAW status
             Text(pair.rawURL != nil ? "RAW✅" : "RAW🚫")
                 .font(.caption2)
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: 110)
         // NEW: Context menu for renaming
