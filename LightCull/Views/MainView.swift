@@ -583,11 +583,9 @@ struct MainView: View {
 
         // 2. Generate thumbnails (with progress callback)
         let updatedPairs: [ImagePair] = await thumbnailService.generateThumbnails(for: pairs) { current, total in
-            // This callback is called for each thumbnail
-            // We need to update the UI on the main thread
-            Task { @MainActor in
-                thumbnailProgress = (current: current, total: total)
-            }
+            // This callback is already executed on MainActor (synchronously)
+            // No Task wrapper needed - UI updates happen immediately
+            thumbnailProgress = (current: current, total: total)
         }
 
         // 3. Update pairs array with thumbnail URLs
