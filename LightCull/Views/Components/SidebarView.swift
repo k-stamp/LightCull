@@ -40,6 +40,10 @@ struct SidebarView: View {
 
             metadataSection
 
+            Divider()
+
+            shortcutsSection
+
             Spacer()
         }
         .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
@@ -200,6 +204,56 @@ struct SidebarView: View {
                metadata.aperture != nil ||
                metadata.shutterSpeed != nil ||
                metadata.iso != nil
+    }
+
+    // MARK: - Shortcuts Section (NEW!)
+
+    /// Displays a compact overview of keyboard shortcuts
+    private var shortcutsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Shortcuts")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .padding(.horizontal)
+
+            VStack(alignment: .leading, spacing: 4) {
+                // Navigation
+                shortcutRow(key: "← →", description: "Navigate")
+
+                // Tags and Actions
+                shortcutRow(key: "T", description: "Toggle TOP tag")
+                shortcutRow(key: "D", description: "Move to Löschen")
+                shortcutRow(key: "A", description: "Move to Archiv")
+                shortcutRow(key: "O", description: "Move to Outtakes")
+
+                // Zoom
+                shortcutRow(key: "⌘ + / -", description: "Zoom in/out")
+                shortcutRow(key: "⌘ 0", description: "Reset zoom")
+
+                // View
+                shortcutRow(key: "⌘ ⌥ T", description: "Toggle thumbnails")
+
+                // Other
+                shortcutRow(key: "⌘ Z", description: "Undo last move")
+                shortcutRow(key: "⌘ N", description: "Rename selected")
+            }
+        }
+    }
+
+    /// Helper function: Creates a row for a keyboard shortcut
+    private func shortcutRow(key: String, description: String) -> some View {
+        HStack(spacing: 8) {
+            Text(key)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundStyle(.secondary)
+                .frame(minWidth: 50, alignment: .leading)
+
+            Text(description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal)
     }
     
     // MARK: - Helper Methods
