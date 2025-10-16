@@ -50,6 +50,9 @@ struct MainView: View {
     // NEW: State for thumbnail bar visibility
     @State private var showThumbnailBar = true
 
+    // NEW: State for thumbnail bar height (resizable)
+    @State private var thumbnailBarHeight: CGFloat = 180
+
     // Initialization for tests and previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
         _pairs = State(initialValue: pairs)
@@ -84,11 +87,15 @@ struct MainView: View {
 
                     // NEW: Conditional rendering - only show when showThumbnailBar is true
                     if showThumbnailBar {
+                        // Resizable divider between image viewer and thumbnail bar
+                        resizableDivider
+
                         ThumbnailBarView(
                             pairs: pairs,
                             selectedPair: $selectedPair,
                             selectedPairs: $selectedPairs,
-                            onRenameSelected: handleRenameButtonClicked
+                            onRenameSelected: handleRenameButtonClicked,
+                            height: $thumbnailBarHeight
                         )
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
@@ -270,7 +277,43 @@ struct MainView: View {
         }
         .disabled(selectedPair == nil)
     }
-    
+
+    // MARK: - Resizable Divider
+
+    /// Resizable divider between image viewer and thumbnail bar
+    private var resizableDivider: some View {
+        Rectangle()
+            .fill(Color(.separatorColor))
+            .frame(height: 1)
+            .frame(maxWidth: .infinity)
+            .overlay {
+                // Invisible hit area for better dragging
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(height: 10)
+            }
+            .onHover { hovering in
+                // Change cursor to resize cursor when hovering
+                if hovering {
+                    NSCursor.resizeUpDown.push()
+                } else {
+                    NSCursor.pop()
+                }
+            }
+            .gesture(
+                DragGesture()
+                    .onChanged { value in
+                        // Update height based on drag (inverted: dragging up = larger height)
+                        let newHeight = thumbnailBarHeight - value.translation.height
+
+                        // Clamp between min and max values
+                        let minHeight: CGFloat = 120
+                        let maxHeight: CGFloat = 400
+                        thumbnailBarHeight = min(max(newHeight, minHeight), maxHeight)
+                    }
+            )
+    }
+
     // MARK: - Event Handlers
     
     /// Handles toggling of the TOP tag for the currently selected image
