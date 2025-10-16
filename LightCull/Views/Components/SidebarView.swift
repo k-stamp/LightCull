@@ -27,23 +27,24 @@ struct SidebarView: View {
                 .font(.title)
                 .fontWeight(.bold)
                 .padding(.horizontal)
-            
+
             Divider()
-            
+
             folderSelectionSection
-            
+
             Divider()
-            
+
             infoSection
-            
+
             Divider()
-            
+
             metadataSection
-            
+
             Spacer()
         }
         .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
         .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
+        .background(Color.black)
     }
     
     // MARK: - Folder Selection Section
