@@ -47,6 +47,9 @@ struct MainView: View {
     @State private var isGeneratingThumbnails = false
     @State private var thumbnailProgress: (current: Int, total: Int) = (0, 0)
 
+    // NEW: State for thumbnail bar visibility
+    @State private var showThumbnailBar = true
+
     // Initialization for tests and previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
         _pairs = State(initialValue: pairs)
@@ -79,13 +82,18 @@ struct MainView: View {
                         onOuttakeImage: handleOuttake  // NEW: Callback for outtake
                     )
 
-                    ThumbnailBarView(
-                        pairs: pairs,
-                        selectedPair: $selectedPair,
-                        selectedPairs: $selectedPairs,
-                        onRenameSelected: handleRenameButtonClicked
-                    )
+                    // NEW: Conditional rendering - only show when showThumbnailBar is true
+                    if showThumbnailBar {
+                        ThumbnailBarView(
+                            pairs: pairs,
+                            selectedPair: $selectedPair,
+                            selectedPairs: $selectedPairs,
+                            onRenameSelected: handleRenameButtonClicked
+                        )
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
                 }
+                .animation(.easeInOut(duration: 0.25), value: showThumbnailBar)
                 .background(Color(.controlBackgroundColor))
 
                 // NEW: Invisible buttons for keyboard shortcuts
@@ -96,6 +104,10 @@ struct MainView: View {
 
                     Button("Undo Delete") { handleUndo() }
                         .keyboardShortcut("z", modifiers: .command)
+                        .hidden()
+
+                    Button("Toggle Thumbnail Bar") { showThumbnailBar.toggle() }
+                        .keyboardShortcut("t", modifiers: [.command, .option])
                         .hidden()
                 }
                 .frame(width: 0, height: 0)
@@ -112,6 +124,12 @@ struct MainView: View {
 
                         // Zoom controls on the right
                         zoomControlsView
+
+                        Divider()
+                            .frame(height: 20)
+
+                        // NEW: Thumbnail bar toggle button
+                        thumbnailBarToggleButton
                     }
                 }
             }
@@ -166,6 +184,20 @@ struct MainView: View {
                 handleRenameCancel()
             }
         )
+    }
+
+    // MARK: - Thumbnail Bar Toggle (NEW!)
+
+    /// Thumbnail bar toggle button for the toolbar
+    private var thumbnailBarToggleButton: some View {
+        Button(action: {
+            showThumbnailBar.toggle()
+        }) {
+            Image(systemName: "sidebar.right")
+                .imageScale(.large)
+                .foregroundStyle(showThumbnailBar ? .primary : .secondary)
+        }
+        .help("Toggle thumbnail bar (⌘⌥T)")
     }
 
     // MARK: - Tag Button (NEW!)
