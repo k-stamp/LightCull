@@ -44,6 +44,20 @@ struct ThumbnailBarView: View {
         return max(height - overhead, minimumSize)
     }
 
+    /// Current position of the selected image (1-based for UI)
+    private var currentPosition: Int? {
+        guard let selected = selectedPair,
+              let index = pairs.firstIndex(of: selected) else {
+            return nil
+        }
+        return index + 1  // 1-based instead of 0-based
+    }
+
+    /// Total number of images (only JPEGs, not counting RAWs)
+    private var totalImages: Int {
+        return pairs.count
+    }
+
     var body: some View {
         VStack {
             if pairs.isEmpty {
@@ -69,8 +83,30 @@ struct ThumbnailBarView: View {
     // MARK: - Thumbnail Content
     private var thumbnailContentView: some View {
         thumbnailScrollView
+            .overlay(alignment: .topTrailing) {
+                // Position indicator in the top-right corner
+                positionIndicator
+                    .padding([.top, .trailing], 12)
+            }
     }
     
+    // MARK: - Position Indicator
+
+    /// Shows current image position (e.g., "Bild 5 von 23")
+    private var positionIndicator: some View {
+        Group {
+            if let position = currentPosition {
+                Text("Bild \(position) von \(totalImages)")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.6))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+        }
+    }
+
     // MARK: - Thumbnail ScrollView
     private var thumbnailScrollView: some View {
         ScrollViewReader { scrollProxy in
