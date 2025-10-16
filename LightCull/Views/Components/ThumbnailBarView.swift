@@ -18,6 +18,9 @@ struct ThumbnailBarView: View {
     // NEW: Callback for context menu "Rename"
     let onRenameSelected: () -> Void
 
+    // NEW: Adjustable height for the thumbnail bar
+    @Binding var height: CGFloat
+
     // NEW: State for last click (for shift-selection)
     @State private var lastClickedPairID: UUID? = nil
 
@@ -29,7 +32,7 @@ struct ThumbnailBarView: View {
                 thumbnailContentView
             }
         }
-        .frame(height: 150) // Fixed height for thumbnail area
+        .frame(height: height) // Adjustable height for thumbnail area
         .frame(maxWidth: .infinity)
         .background(Color.black)
     }
@@ -71,7 +74,7 @@ struct ThumbnailBarView: View {
             AsyncImage(url: pair.thumbnailURL ?? pair.jpegURL) { image in
                 image
                     .resizable()
-                    .aspectRatio(contentMode: .fit)
+                    .aspectRatio(contentMode: .fill)
             } placeholder: {
                 Rectangle()
                     .fill(Color(.quaternaryLabelColor))
@@ -81,6 +84,7 @@ struct ThumbnailBarView: View {
                     }
             }
             .frame(width: 100, height: 100)
+            .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay {
                 // Border logic: Blue when multi-selected, accent when single-selected
@@ -283,7 +287,8 @@ struct ThumbnailBarView: View {
         pairs: [],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
-        onRenameSelected: { }
+        onRenameSelected: { },
+        height: .constant(180)
     )
 }
 
@@ -308,6 +313,7 @@ struct ThumbnailBarView: View {
         ],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
-        onRenameSelected: { }
+        onRenameSelected: { },
+        height: .constant(180)
     )
 }
