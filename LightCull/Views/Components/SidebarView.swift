@@ -73,6 +73,14 @@ struct SidebarView: View {
                         .textSelection(.enabled)  // Ermöglicht Kopieren des Pfads
                 }
                 .padding(.horizontal)
+
+                Button {
+                    openInFinder(folderURL)
+                } label: {
+                    Label("Open in Finder", systemImage: "folder")
+                }
+                .buttonStyle(.bordered)
+                .padding(.horizontal)
             }
         }
     }
@@ -220,6 +228,11 @@ struct SidebarView: View {
             // This prevents blocking the main thread
             onFolderSelected(url)
         }
+    }
+
+    /// Öffnet ein Finder-Fenster mit dem angegebenen Ordner
+    private func openInFinder(_ url: URL) {
+        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
     }
 }
 
