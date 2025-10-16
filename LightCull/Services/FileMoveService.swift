@@ -1,14 +1,14 @@
 //
-//  FileDeleteService.swift
+//  FileMoveService.swift
 //  LightCull
 //
-//  Responsible for: Moving images to the _toDelete folder
+//  Responsible for: Moving images to destination folders (_toDelete, _Archive, _Outtakes)
 //
 
 import Foundation
 import OSLog
 
-class FileDeleteService {
+class FileMoveService {
 
     // MARK: - Dependencies
 
@@ -17,7 +17,7 @@ class FileDeleteService {
 
     // MARK: - Initializer
 
-    /// Initializes the FileDeleteService with a ThumbnailService
+    /// Initializes the FileMoveService with a ThumbnailService
     /// - Parameter thumbnailService: The service for managing thumbnails
     init(thumbnailService: ThumbnailService = ThumbnailService()) {
         self.thumbnailService = thumbnailService
@@ -25,24 +25,25 @@ class FileDeleteService {
 
     // MARK: - Public Methods
 
-    /// Moves an ImagePair to the _toDelete folder
+    /// Moves an ImagePair to a destination folder
     /// - Parameters:
     ///   - pair: The ImagePair to be moved
     ///   - folderURL: The folder where the images are currently located
-    /// - Returns: A DeleteOperation for Undo, or nil on error
-    func deletePair(_ pair: ImagePair, in folderURL: URL) -> DeleteOperation? {
-        // 1. Create _toDelete folder (if it doesn't exist)
-        let toDeleteFolderURL: URL = folderURL.appendingPathComponent("_toDelete")
-        let didCreateFolder: Bool = ensureToDeleteFolderExists(at: toDeleteFolderURL)
+    ///   - destinationFolderName: The name of the destination folder (e.g., "_toDelete", "_Archive", "_Outtakes")
+    /// - Returns: A MoveOperation for Undo, or nil on error
+    func movePair(_ pair: ImagePair, in folderURL: URL, toFolder destinationFolderName: String) -> MoveOperation? {
+        // 1. Create destination folder (if it doesn't exist)
+        let destinationFolderURL: URL = folderURL.appendingPathComponent(destinationFolderName)
+        let didCreateFolder: Bool = ensureFolderExists(at: destinationFolderURL, named: destinationFolderName)
 
         if didCreateFolder == false {
-            Logger.fileOps.error("Could not create _toDelete folder")
+            Logger.fileOps.error("Could not create \(destinationFolderName) folder")
             return nil
         }
 
         // 2. Move JPEG
         let jpegFileName: String = pair.jpegURL.lastPathComponent
-        let newJpegURL: URL = toDeleteFolderURL.appendingPathComponent(jpegFileName)
+        let newJpegURL: URL = destinationFolderURL.appendingPathComponent(jpegFileName)
 
         let jpegMoved: Bool = moveFile(from: pair.jpegURL, to: newJpegURL)
 
@@ -51,12 +52,12 @@ class FileDeleteService {
             return nil
         }
 
-        Logger.fileOps.info("JPEG moved: \(jpegFileName)")
+        Logger.fileOps.info("JPEG moved to \(destinationFolderName): \(jpegFileName)")
 
         // 2b. Move thumbnail (non-critical - don't abort if it fails)
         let thumbnailMoved: Bool = thumbnailService.moveThumbnailToDeleteFolder(for: pair.jpegURL)
         if thumbnailMoved {
-            Logger.fileOps.debug("Thumbnail moved to _toDelete")
+            Logger.fileOps.debug("Thumbnail moved to \(destinationFolderName)")
         } else {
             Logger.fileOps.notice("Thumbnail could not be moved (non-critical)")
         }
@@ -67,7 +68,7 @@ class FileDeleteService {
         if let rawURL = pair.rawURL {
             // There is a RAW - so we move it too
             let rawFileName: String = rawURL.lastPathComponent
-            let targetRawURL: URL = toDeleteFolderURL.appendingPathComponent(rawFileName)
+            let targetRawURL: URL = destinationFolderURL.appendingPathComponent(rawFileName)
 
             let rawMoved: Bool = moveFile(from: rawURL, to: targetRawURL)
 
@@ -82,27 +83,54 @@ class FileDeleteService {
             }
 
             newRawURL = targetRawURL
-            Logger.fileOps.info("RAW moved: \(rawFileName)")
+            Logger.fileOps.info("RAW moved to \(destinationFolderName): \(rawFileName)")
         }
 
-        // 4. Create DeleteOperation for Undo
-        let operation = DeleteOperation(
+        // 4. Create MoveOperation for Undo
+        let operation = MoveOperation(
             originalJpegURL: pair.jpegURL,
-            deletedJpegURL: newJpegURL,
+            movedJpegURL: newJpegURL,
             originalRawURL: pair.rawURL,
-            deletedRawURL: newRawURL,
+            movedRawURL: newRawURL,
             timestamp: Date()
         )
 
         return operation
     }
 
-    /// Undoes a delete operation (moves files back)
-    /// - Parameter operation: The DeleteOperation to be undone
+    /// Convenience method: Moves an ImagePair to the _toDelete folder
+    /// - Parameters:
+    ///   - pair: The ImagePair to be moved
+    ///   - folderURL: The folder where the images are currently located
+    /// - Returns: A MoveOperation for Undo, or nil on error
+    func deletePair(_ pair: ImagePair, in folderURL: URL) -> MoveOperation? {
+        return movePair(pair, in: folderURL, toFolder: "_toDelete")
+    }
+
+    /// Convenience method: Moves an ImagePair to the _Archive folder
+    /// - Parameters:
+    ///   - pair: The ImagePair to be moved
+    ///   - folderURL: The folder where the images are currently located
+    /// - Returns: A MoveOperation for Undo, or nil on error
+    func archivePair(_ pair: ImagePair, in folderURL: URL) -> MoveOperation? {
+        return movePair(pair, in: folderURL, toFolder: "_Archive")
+    }
+
+    /// Convenience method: Moves an ImagePair to the _Outtakes folder
+    /// - Parameters:
+    ///   - pair: The ImagePair to be moved
+    ///   - folderURL: The folder where the images are currently located
+    /// - Returns: A MoveOperation for Undo, or nil on error
+    func outtakePair(_ pair: ImagePair, in folderURL: URL) -> MoveOperation? {
+        return movePair(pair, in: folderURL, toFolder: "_Outtakes")
+    }
+
+    /// Undoes a move operation (moves files back)
+    /// - Parameter operation: The MoveOperation to be undone
     /// - Returns: true on success, false on error
-    func undoDelete(_ operation: DeleteOperation) -> Bool {
+    func undoMove(_ operation: MoveOperation) -> Bool {
         // 1. Move JPEG back
-        let jpegRestored: Bool = moveFile(from: operation.deletedJpegURL, to: operation.originalJpegURL)
+        let jpegRestored: Bool = moveFile(from: operation.movedJpegURL, to: operation.originalJpegURL)
 
         if jpegRestored == false {
             Logger.fileOps.error("JPEG could not be moved back")
@@ -114,23 +142,23 @@ class FileDeleteService {
         // 1b. Restore thumbnail (non-critical - don't abort if it fails)
         let thumbnailRestored: Bool = thumbnailService.moveThumbnailFromDeleteFolder(for: operation.originalJpegURL)
         if thumbnailRestored {
-            Logger.fileOps.debug("Thumbnail restored from _toDelete")
+            Logger.fileOps.debug("Thumbnail restored")
         } else {
             Logger.fileOps.notice("Thumbnail could not be restored (non-critical)")
         }
 
         // 2. Move RAW back (if present)
-        if let deletedRawURL = operation.deletedRawURL {
+        if let movedRawURL = operation.movedRawURL {
             // We also need to have the original RAW URL
             if let originalRawURL = operation.originalRawURL {
-                let rawRestored: Bool = moveFile(from: deletedRawURL, to: originalRawURL)
+                let rawRestored: Bool = moveFile(from: movedRawURL, to: originalRawURL)
 
                 if rawRestored == false {
                     Logger.fileOps.error("RAW could not be moved back")
-                    // IMPORTANT: Move JPEG back to _toDelete!
-                    let jpegMovedBack: Bool = moveFile(from: operation.originalJpegURL, to: operation.deletedJpegURL)
+                    // IMPORTANT: Move JPEG back to destination folder!
+                    let jpegMovedBack: Bool = moveFile(from: operation.originalJpegURL, to: operation.movedJpegURL)
                     if jpegMovedBack {
-                        Logger.fileOps.notice("JPEG was moved back to _toDelete")
+                        Logger.fileOps.notice("JPEG was moved back to destination folder")
                     }
                     return false
                 }
@@ -144,10 +172,12 @@ class FileDeleteService {
 
     // MARK: - Private Helper Methods
 
-    /// Ensures that the _toDelete folder exists
-    /// - Parameter url: The URL of the _toDelete folder
+    /// Ensures that a folder exists
+    /// - Parameters:
+    ///   - url: The URL of the folder
+    ///   - named: The name of the folder (for logging)
     /// - Returns: true if folder exists or was created, false on error
-    private func ensureToDeleteFolderExists(at url: URL) -> Bool {
+    private func ensureFolderExists(at url: URL, named folderName: String) -> Bool {
         let fileManager = FileManager.default
 
         // Check if folder already exists
@@ -161,7 +191,7 @@ class FileDeleteService {
                 return true
             } else {
                 // A FILE with this name exists - error!
-                Logger.fileOps.error("'_toDelete' exists as a file, not as a folder")
+                Logger.fileOps.error("'\(folderName)' exists as a file, not as a folder")
                 return false
             }
         }
@@ -169,10 +199,10 @@ class FileDeleteService {
         // Folder doesn't exist - so we create it
         do {
             try fileManager.createDirectory(at: url, withIntermediateDirectories: false, attributes: nil)
-            Logger.fileOps.info("_toDelete folder created")
+            Logger.fileOps.info("\(folderName) folder created")
             return true
         } catch {
-            Logger.fileOps.error("Error creating _toDelete folder: \(error.localizedDescription)")
+            Logger.fileOps.error("Error creating \(folderName) folder: \(error.localizedDescription)")
             return false
         }
     }

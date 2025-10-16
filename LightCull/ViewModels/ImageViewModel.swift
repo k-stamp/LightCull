@@ -24,7 +24,7 @@ class ImageViewModel: ObservableObject {
     // MARK: - Dependencies
 
     private let tagService: FinderTagService
-    private let deleteService: FileDeleteService
+    private let moveService: FileMoveService
     
     
     // MARK: - Constants
@@ -39,18 +39,18 @@ class ImageViewModel: ObservableObject {
     let zoomStep: CGFloat = 0.25
     
     
-    // MARK: - Delete History (for Undo)
+    // MARK: - Move History (for Undo)
 
-    // Here we store all delete operations for undo
+    // Here we store all move operations for undo
     // This is a simple array - the newest element is always at the end
-    private var deleteHistory: [DeleteOperation] = []
+    private var moveHistory: [MoveOperation] = []
 
 
     // MARK: - Initializer
 
-    init(tagService: FinderTagService = FinderTagService(), deleteService: FileDeleteService = FileDeleteService()) {
+    init(tagService: FinderTagService = FinderTagService(), moveService: FileMoveService = FileMoveService()) {
         self.tagService = tagService
-        self.deleteService = deleteService
+        self.moveService = moveService
     }
     
     
@@ -286,76 +286,117 @@ class ImageViewModel: ObservableObject {
     }
     
     
-    // MARK: - Delete Actions
+    // MARK: - Move Actions
 
     /// Moves an ImagePair to the _toDelete folder
     /// - Parameters:
-    ///   - pair: The ImagePair to be deleted
+    ///   - pair: The ImagePair to be moved
     ///   - folderURL: The folder where the images are located
     ///   - completion: Callback when the operation is finished (true = success, false = error)
     func deleteImagePair(pair: ImagePair, in folderURL: URL, completion: @escaping (Bool) -> Void) {
-        // Call delete service to move the files
-        let operation: DeleteOperation? = deleteService.deletePair(pair, in: folderURL)
+        moveImagePair(pair: pair, in: folderURL, using: moveService.deletePair, operationName: "delete", completion: completion)
+    }
+
+    /// Moves an ImagePair to the _Archive folder
+    /// - Parameters:
+    ///   - pair: The ImagePair to be moved
+    ///   - folderURL: The folder where the images are located
+    ///   - completion: Callback when the operation is finished (true = success, false = error)
+    func archiveImagePair(pair: ImagePair, in folderURL: URL, completion: @escaping (Bool) -> Void) {
+        moveImagePair(pair: pair, in: folderURL, using: moveService.archivePair, operationName: "archive", completion: completion)
+    }
+
+    /// Moves an ImagePair to the _Outtakes folder
+    /// - Parameters:
+    ///   - pair: The ImagePair to be moved
+    ///   - folderURL: The folder where the images are located
+    ///   - completion: Callback when the operation is finished (true = success, false = error)
+    func outtakeImagePair(pair: ImagePair, in folderURL: URL, completion: @escaping (Bool) -> Void) {
+        moveImagePair(pair: pair, in: folderURL, using: moveService.outtakePair, operationName: "outtake", completion: completion)
+    }
+
+    /// Generic helper method to move an ImagePair using a specific move service method
+    /// - Parameters:
+    ///   - pair: The ImagePair to be moved
+    ///   - folderURL: The folder where the images are located
+    ///   - moveMethod: The move service method to use
+    ///   - operationName: The name of the operation (for logging)
+    ///   - completion: Callback when the operation is finished (true = success, false = error)
+    private func moveImagePair(pair: ImagePair, in folderURL: URL, using moveMethod: (ImagePair, URL) -> MoveOperation?, operationName: String, completion: @escaping (Bool) -> Void) {
+        // Call move service to move the files
+        let operation: MoveOperation? = moveMethod(pair, folderURL)
 
         // Did it work?
         if let operation = operation {
             // Yes! Add operation to history
-            deleteHistory.append(operation)
-            Logger.fileOps.info("ImagePair deleted - history now contains \(self.deleteHistory.count) operations")
+            moveHistory.append(operation)
+            Logger.fileOps.info("ImagePair \(operationName)d - history now contains \(self.moveHistory.count) operations")
 
             // Call callback with success
             completion(true)
         } else {
             // No - error!
-            Logger.fileOps.error("Error deleting ImagePair")
+            Logger.fileOps.error("Error \(operationName)ing ImagePair")
 
             // Call callback with error
             completion(false)
         }
     }
 
-    /// Undoes the last delete operation
+    /// Undoes the last move operation
     /// - Parameter completion: Callback when the operation is finished (true = success, false = error)
-    func undoLastDelete(completion: @escaping (Bool) -> Void) {
+    func undoLastMove(completion: @escaping (Bool) -> Void) {
         // Is there anything to undo?
-        if deleteHistory.isEmpty {
-            Logger.fileOps.notice("No delete operations to undo")
+        if moveHistory.isEmpty {
+            Logger.fileOps.notice("No move operations to undo")
             completion(false)
             return
         }
 
         // Get last operation from history
         // removeLast() gets the last element AND removes it from the array
-        let lastOperation: DeleteOperation = deleteHistory.removeLast()
+        let lastOperation: MoveOperation = moveHistory.removeLast()
 
-        Logger.fileOps.debug("Undoing delete: \(lastOperation.originalJpegURL.lastPathComponent)")
+        Logger.fileOps.debug("Undoing move: \(lastOperation.originalJpegURL.lastPathComponent)")
 
-        // Call delete service to move the files back
-        let success: Bool = deleteService.undoDelete(lastOperation)
+        // Call move service to move the files back
+        let success: Bool = moveService.undoMove(lastOperation)
 
         if success {
-            Logger.fileOps.info("Undo successful - history now contains \(self.deleteHistory.count) operations")
+            Logger.fileOps.info("Undo successful - history now contains \(self.moveHistory.count) operations")
             completion(true)
         } else {
             Logger.fileOps.error("Undo failed")
             // On error, add the operation BACK to history
-            self.deleteHistory.append(lastOperation)
+            self.moveHistory.append(lastOperation)
             completion(false)
         }
     }
 
-    /// Checks if there are delete operations that can be undone
+    /// Checks if there are move operations that can be undone
     /// - Returns: true if undo is possible, false if not
     func canUndo() -> Bool {
         // Simply check if the history is empty or not
-        let hasHistory: Bool = deleteHistory.isEmpty == false
+        let hasHistory: Bool = moveHistory.isEmpty == false
         return hasHistory
     }
 
-    /// Clears the complete delete history (e.g. on folder change)
+    /// Clears the complete move history (e.g. on folder change)
+    func clearMoveHistory() {
+        moveHistory.removeAll()
+        Logger.fileOps.debug("Move history cleared")
+    }
+
+    /// Legacy method name for backward compatibility
+    @available(*, deprecated, renamed: "undoLastMove")
+    func undoLastDelete(completion: @escaping (Bool) -> Void) {
+        undoLastMove(completion: completion)
+    }
+
+    /// Legacy method name for backward compatibility
+    @available(*, deprecated, renamed: "clearMoveHistory")
     func clearDeleteHistory() {
-        deleteHistory.removeAll()
-        Logger.fileOps.debug("Delete history cleared")
+        clearMoveHistory()
     }
 
 
