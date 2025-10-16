@@ -161,6 +161,10 @@ struct SidebarView: View {
                     if let shutterSpeed = metadata.shutterSpeed {
                         metadataRow(label: "Exposure", value: shutterSpeed)
                     }
+
+                    if let iso = metadata.iso {
+                        metadataRow(label: "ISO", value: iso)
+                    }
                 }
             } else {
                 // If no metadata is available, show placeholder
@@ -194,7 +198,8 @@ struct SidebarView: View {
                metadata.cameraModel != nil ||
                metadata.focalLength != nil ||
                metadata.aperture != nil ||
-               metadata.shutterSpeed != nil
+               metadata.shutterSpeed != nil ||
+               metadata.iso != nil
     }
     
     // MARK: - Helper Methods
@@ -272,7 +277,8 @@ struct SidebarView: View {
             cameraModel: "X-T5",
             focalLength: "35.0 mm",
             aperture: "f/2.8",
-            shutterSpeed: "1/250s"
+            shutterSpeed: "1/250s",
+            iso: "ISO 800"
         ),
         statistics: FolderStatistics(
             totalFiles: 150,

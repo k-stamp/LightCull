@@ -50,8 +50,9 @@ class MetadataService {
         let focalLength = formatFocalLength(from: exifData)
         let aperture = formatAperture(from: exifData)
         let shutterSpeed = formatShutterSpeed(from: exifData)
-        
-        
+        let iso = formatISO(from: exifData)
+
+
         return ImageMetadata(
             fileName: fileName,
             fileSize: fileSize,
@@ -59,7 +60,8 @@ class MetadataService {
             cameraModel: cameraModel,
             focalLength: focalLength,
             aperture: aperture,
-            shutterSpeed: shutterSpeed
+            shutterSpeed: shutterSpeed,
+            iso: iso
         )
     }
     
@@ -109,15 +111,28 @@ class MetadataService {
         guard let exposureTime = exifData[kCGImagePropertyExifExposureTime as String] as? Double else {
             return nil
         }
-        
+
         // If the time is >= 1 second, show as decimal number
         if exposureTime >= 1.0 {
             return String(format: "%.1fs", exposureTime)
         }
-        
+
         // If < 1 second, show as fraction (e.g. "1/250s")
         // Calculation: 1 / 0.004 = 250
         let denominator = Int(1.0 / exposureTime)
         return "1/\(denominator)s"
+    }
+
+
+    private func formatISO(from exifData: [String: Any]) -> String? {
+        // EXIF stores ISO as an array of numbers (usually only one value)
+        // e.g. [800] or [1600]
+        guard let isoArray = exifData[kCGImagePropertyExifISOSpeedRatings as String] as? [NSNumber],
+              let isoValue = isoArray.first else {
+            return nil
+        }
+
+        // Formatting: "ISO " + integer value
+        return "ISO \(isoValue.intValue)"
     }
 }
