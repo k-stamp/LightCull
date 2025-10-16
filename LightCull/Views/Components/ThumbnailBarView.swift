@@ -31,7 +31,7 @@ struct ThumbnailBarView: View {
         }
         .frame(height: 150) // Fixed height for thumbnail area
         .frame(maxWidth: .infinity)
-        .background(Color(.controlBackgroundColor))
+        .background(Color.black)
     }
     
     // MARK: - Empty State
