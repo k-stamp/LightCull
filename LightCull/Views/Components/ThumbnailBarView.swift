@@ -36,43 +36,16 @@ struct ThumbnailBarView: View {
     
     // MARK: - Empty State
     private var emptyStateView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Thumbnail-Leiste")
-                    .font(.headline)
-                    .padding(.leading)
-            }
-            
-            Text("Keine Bilder verfügbar")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 40)
-        }
+        Text("Keine Bilder verfügbar")
+            .font(.subheadline)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 40)
     }
     
     // MARK: - Thumbnail Content
     private var thumbnailContentView: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            headerView
-            thumbnailScrollView
-        }
-    }
-    
-    // MARK: - Header
-    private var headerView: some View {
-        HStack {
-            Text("Thumbnail-Leiste")
-                .font(.headline)
-                .padding(.leading)
-            
-            Spacer()
-            
-            Text("\(pairs.count) Bildpaare")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .padding(.trailing)
-        }
+        thumbnailScrollView
     }
     
     // MARK: - Thumbnail ScrollView
