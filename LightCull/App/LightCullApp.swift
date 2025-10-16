@@ -21,6 +21,7 @@ struct LightCullApp: App {
     var body: some Scene {
         WindowGroup("LightCull") {
             MainView()
+                .preferredColorScheme(.dark)
         }
     }
 }
