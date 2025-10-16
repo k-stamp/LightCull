@@ -585,8 +585,8 @@ struct MainView: View {
                 // Delete was successful!
                 Logger.ui.info("Delete successful")
 
-                // 5. Rescan folder, then select next image in completion
-                rescanFolder(folder) {
+                // 5. Rescan folder (WITHOUT regenerating thumbnails), then select next image
+                rescanFolderWithoutThumbnails(folder) {
                     // 6. Select next image AFTER rescan completes
                     selectNextImageAfterDelete(deletedIndex: currentIndex)
                 }
@@ -624,8 +624,8 @@ struct MainView: View {
                 // Archive was successful!
                 Logger.ui.info("Archive successful")
 
-                // 5. Rescan folder, then select next image in completion
-                rescanFolder(folder) {
+                // 5. Rescan folder (WITHOUT regenerating thumbnails), then select next image
+                rescanFolderWithoutThumbnails(folder) {
                     // 6. Select next image AFTER rescan completes
                     selectNextImageAfterDelete(deletedIndex: currentIndex)
                 }
@@ -663,8 +663,8 @@ struct MainView: View {
                 // Outtake was successful!
                 Logger.ui.info("Outtake successful")
 
-                // 5. Rescan folder, then select next image in completion
-                rescanFolder(folder) {
+                // 5. Rescan folder (WITHOUT regenerating thumbnails), then select next image
+                rescanFolderWithoutThumbnails(folder) {
                     // 6. Select next image AFTER rescan completes
                     selectNextImageAfterDelete(deletedIndex: currentIndex)
                 }
@@ -701,12 +701,12 @@ struct MainView: View {
                 // Undo was successful!
                 Logger.ui.info("Undo successful")
 
-                // 4. Rescan folder (so the restored image appears)
-                rescanFolder(folder)
-
-                // 5. Select the restored image (it's now the last in the list)
-                if pairs.isEmpty == false {
-                    selectedPair = pairs.last
+                // 4. Rescan folder (WITHOUT regenerating thumbnails) to show restored image
+                rescanFolderWithoutThumbnails(folder) {
+                    // 5. Select the restored image (it's now the last in the list)
+                    if pairs.isEmpty == false {
+                        selectedPair = pairs.last
+                    }
                 }
             } else {
                 // Undo failed
@@ -846,6 +846,59 @@ struct MainView: View {
         await MainActor.run {
             pairs = updatedPairs
             Logger.ui.info("Thumbnail generation complete - \(pairs.count) pairs updated")
+        }
+    }
+
+    /// Rescans folder WITHOUT regenerating thumbnails (reuses cached thumbnails)
+    /// This is much faster than rescanFolder() for large libraries
+    /// - Parameters:
+    ///   - folder: The folder to rescan
+    ///   - completion: Optional callback after rescan completes (on main thread)
+    private func rescanFolderWithoutThumbnails(_ folder: URL, completion: (() -> Void)? = nil) {
+        // NOTE: No progress sheet shown - this is fast!
+
+        // Rescan asynchronously (to prevent blocking main thread)
+        Task {
+            Logger.ui.info("Rescanning folder without thumbnail regeneration: \(folder.path)")
+
+            // 1. Load pairs from folder (on background thread)
+            let (loadedPairs, loadedStatistics) = await Task.detached {
+                // Create FileService
+                let fileService = await FileService(tagService: FinderTagService())
+
+                // Find image pairs (fast - just reads directory)
+                let pairs = await fileService.findImagePairs(in: folder)
+
+                // Get folder statistics
+                let stats = await fileService.getFolderStatistics(in: folder)
+
+                await Logger.ui.info("Found \(pairs.count) image pairs (rescan)")
+                return (pairs, stats)
+            }.value
+
+            // 2. Assign cached thumbnail URLs (very fast - no file I/O)
+            let pairsWithThumbnails: [ImagePair] = loadedPairs.map { pair in
+                // Get thumbnail URL from cache (doesn't check if file exists - just builds the path)
+                let thumbnailURL = thumbnailService.getThumbnailURL(for: pair.jpegURL)
+
+                // Create updated pair with thumbnail URL
+                return ImagePair(
+                    jpegURL: pair.jpegURL,
+                    rawURL: pair.rawURL,
+                    hasTopTag: pair.hasTopTag,
+                    thumbnailURL: thumbnailURL
+                )
+            }
+
+            // 3. Update pairs and statistics on main thread
+            await MainActor.run {
+                pairs = pairsWithThumbnails
+                folderStatistics = loadedStatistics
+                Logger.ui.info("Rescan complete - \(pairs.count) pairs updated (thumbnails reused from cache)")
+
+                // Call completion callback
+                completion?()
+            }
         }
     }
     
