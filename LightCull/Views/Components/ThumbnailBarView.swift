@@ -18,31 +18,16 @@ struct ThumbnailBarView: View {
     // NEW: Callback for context menu "Rename"
     let onRenameSelected: () -> Void
 
-    // NEW: Adjustable height for the thumbnail bar
-    @Binding var height: CGFloat
-
     // NEW: State for last click (for shift-selection)
     @State private var lastClickedPairID: UUID? = nil
 
     // MARK: - Computed Properties
 
-    /// Dynamically calculates thumbnail size based on available height
-    /// Subtracts overhead for texts, spacing, and padding
-    private var thumbnailSize: CGFloat {
-        // Overhead calculation:
-        // - padding top: 20px
-        // - padding bottom: 20px
-        // - VStack spacing (2x): 12px
-        // - Text 1 (filename): ~14px
-        // - Text 2 (RAW status): ~14px
-        // Total: 80px
-        let overhead: CGFloat = 80
+    /// Fixed height for the thumbnail bar
+    private let fixedHeight: CGFloat = 180
 
-        // Minimum size to prevent too small thumbnails
-        let minimumSize: CGFloat = 40
-
-        return max(height - overhead, minimumSize)
-    }
+    /// Fixed thumbnail size
+    private let thumbnailSize: CGFloat = 100
 
     /// Current position of the selected image (1-based for UI)
     private var currentPosition: Int? {
@@ -66,7 +51,7 @@ struct ThumbnailBarView: View {
                 thumbnailContentView
             }
         }
-        .frame(height: height) // Adjustable height for thumbnail area
+        .frame(height: fixedHeight) // Fixed height for thumbnail area
         .frame(maxWidth: .infinity)
         .background(Color.black)
     }
@@ -114,7 +99,7 @@ struct ThumbnailBarView: View {
                 // VStack to add vertical spacing without affecting scrollbar
                 VStack {
                     Spacer()
-                        .frame(height: 20)
+                        .frame(height: 8)
 
                     LazyHStack(spacing: 12) {
                         ForEach(pairs) { pair in
@@ -128,7 +113,7 @@ struct ThumbnailBarView: View {
                     .padding(.horizontal)
 
                     Spacer()
-                        .frame(height: 20)
+                        .frame(height: 8)
                 }
             }
             .scrollIndicators(.visible) // Explicitly show scrollbar
@@ -366,8 +351,7 @@ struct ThumbnailBarView: View {
         pairs: [],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
-        onRenameSelected: { },
-        height: .constant(180)
+        onRenameSelected: { }
     )
 }
 
@@ -392,7 +376,6 @@ struct ThumbnailBarView: View {
         ],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
-        onRenameSelected: { },
-        height: .constant(180)
+        onRenameSelected: { }
     )
 }

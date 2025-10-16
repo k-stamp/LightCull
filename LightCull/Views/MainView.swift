@@ -50,8 +50,8 @@ struct MainView: View {
     // NEW: State for thumbnail bar visibility
     @State private var showThumbnailBar = true
 
-    // NEW: State for thumbnail bar height (resizable)
-    @State private var thumbnailBarHeight: CGFloat = 180
+    // NEW: State for shortcuts overlay
+    @State private var showShortcutsOverlay = false
 
     // Initialization for tests and previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
@@ -87,21 +87,25 @@ struct MainView: View {
 
                     // NEW: Conditional rendering - only show when showThumbnailBar is true
                     if showThumbnailBar {
-                        // Resizable divider between image viewer and thumbnail bar
-                        resizableDivider
+                        // Separator between image viewer and thumbnail bar
+                        Divider()
 
                         ThumbnailBarView(
                             pairs: pairs,
                             selectedPair: $selectedPair,
                             selectedPairs: $selectedPairs,
-                            onRenameSelected: handleRenameButtonClicked,
-                            height: $thumbnailBarHeight
+                            onRenameSelected: handleRenameButtonClicked
                         )
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
                 .animation(.easeInOut(duration: 0.25), value: showThumbnailBar)
                 .background(Color(.controlBackgroundColor))
+
+                // NEW: Shortcuts overlay
+                if showShortcutsOverlay {
+                    shortcutsOverlayView
+                }
 
                 // NEW: Invisible buttons for keyboard shortcuts
                 VStack {
@@ -137,6 +141,12 @@ struct MainView: View {
 
                         // NEW: Thumbnail bar toggle button
                         thumbnailBarToggleButton
+
+                        Divider()
+                            .frame(height: 20)
+
+                        // NEW: Info button for shortcuts
+                        infoButton
                     }
                 }
             }
@@ -205,6 +215,131 @@ struct MainView: View {
                 .foregroundStyle(showThumbnailBar ? .primary : .secondary)
         }
         .help("Toggle thumbnail bar (⌘⌥T)")
+    }
+
+    // MARK: - Info Button & Shortcuts Overlay (NEW!)
+
+    /// Info button for the toolbar
+    private var infoButton: some View {
+        Button(action: {
+            showShortcutsOverlay.toggle()
+        }) {
+            Image(systemName: "info.circle")
+                .imageScale(.large)
+                .foregroundStyle(showShortcutsOverlay ? .blue : .primary)
+        }
+        .help("Show keyboard shortcuts")
+    }
+
+    /// Shortcuts overlay view
+    private var shortcutsOverlayView: some View {
+        ZStack {
+            // Semi-transparent background
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .onTapGesture {
+                    showShortcutsOverlay = false
+                }
+
+            // Shortcuts panel
+            VStack(alignment: .leading, spacing: 20) {
+                // Header
+                HStack {
+                    Text("Keyboard Shortcuts")
+                        .font(.title2)
+                        .fontWeight(.bold)
+
+                    Spacer()
+
+                    Button(action: {
+                        showShortcutsOverlay = false
+                    }) {
+                        Image(systemName: "xmark.circle.fill")
+                            .imageScale(.large)
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Divider()
+
+                // Shortcuts content
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        shortcutCategory(title: "Navigation", shortcuts: [
+                            ("← →", "Navigate between images")
+                        ])
+
+                        shortcutCategory(title: "Tags & Actions", shortcuts: [
+                            ("T", "Toggle TOP tag"),
+                            ("D", "Move to _toDelete folder"),
+                            ("A", "Move to _Archive folder"),
+                            ("O", "Move to _Outtakes folder"),
+                            ("⌘ Z", "Undo last move")
+                        ])
+
+                        shortcutCategory(title: "Zoom", shortcuts: [
+                            ("⌘ +", "Zoom in"),
+                            ("⌘ -", "Zoom out"),
+                            ("⌘ 0", "Reset zoom to 100%")
+                        ])
+
+                        shortcutCategory(title: "View", shortcuts: [
+                            ("⌘ ⌥ T", "Toggle thumbnail bar")
+                        ])
+
+                        shortcutCategory(title: "Editing", shortcuts: [
+                            ("⌘ N", "Rename selected images")
+                        ])
+                    }
+                }
+
+                Divider()
+
+                // Footer
+                Text("Tip: Hover over toolbar buttons for quick help")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(24)
+            .frame(width: 450, height: 550)
+            .background(Color(.windowBackgroundColor))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(radius: 20)
+        }
+        .transition(.opacity)
+        .animation(.easeInOut(duration: 0.2), value: showShortcutsOverlay)
+    }
+
+    /// Helper function to create a shortcut category section
+    private func shortcutCategory(title: String, shortcuts: [(String, String)]) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.headline)
+                .foregroundStyle(.primary)
+
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(shortcuts, id: \.0) { key, description in
+                    HStack(spacing: 16) {
+                        Text(key)
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                            .frame(minWidth: 80, alignment: .leading)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color(.controlBackgroundColor))
+                            .clipShape(RoundedRectangle(cornerRadius: 4))
+
+                        Text(description)
+                            .font(.body)
+                            .foregroundStyle(.primary)
+
+                        Spacer()
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Tag Button (NEW!)
@@ -276,42 +411,6 @@ struct MainView: View {
             .help("Reset zoom (⌘0)")
         }
         .disabled(selectedPair == nil)
-    }
-
-    // MARK: - Resizable Divider
-
-    /// Resizable divider between image viewer and thumbnail bar
-    private var resizableDivider: some View {
-        Rectangle()
-            .fill(Color(.separatorColor))
-            .frame(height: 1)
-            .frame(maxWidth: .infinity)
-            .overlay {
-                // Invisible hit area for better dragging
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(height: 10)
-            }
-            .onHover { hovering in
-                // Change cursor to resize cursor when hovering
-                if hovering {
-                    NSCursor.resizeUpDown.push()
-                } else {
-                    NSCursor.pop()
-                }
-            }
-            .gesture(
-                DragGesture()
-                    .onChanged { value in
-                        // Update height based on drag (inverted: dragging up = larger height)
-                        let newHeight = thumbnailBarHeight - value.translation.height
-
-                        // Clamp between min and max values
-                        let minHeight: CGFloat = 120
-                        let maxHeight: CGFloat = 400
-                        thumbnailBarHeight = min(max(newHeight, minHeight), maxHeight)
-                    }
-            )
     }
 
     // MARK: - Event Handlers
