@@ -18,30 +18,29 @@ struct ThumbnailBarView: View {
     // NEW: Callback for context menu "Rename"
     let onRenameSelected: () -> Void
 
-    // NEW: Adjustable height for the thumbnail bar
-    @Binding var height: CGFloat
-
     // NEW: State for last click (for shift-selection)
     @State private var lastClickedPairID: UUID? = nil
 
     // MARK: - Computed Properties
 
-    /// Dynamically calculates thumbnail size based on available height
-    /// Subtracts overhead for texts, spacing, and padding
-    private var thumbnailSize: CGFloat {
-        // Overhead calculation:
-        // - padding top: 20px
-        // - padding bottom: 20px
-        // - VStack spacing (2x): 12px
-        // - Text 1 (filename): ~14px
-        // - Text 2 (RAW status): ~14px
-        // Total: 80px
-        let overhead: CGFloat = 80
+    /// Fixed height for the thumbnail bar
+    private let fixedHeight: CGFloat = 180
 
-        // Minimum size to prevent too small thumbnails
-        let minimumSize: CGFloat = 40
+    /// Fixed thumbnail size
+    private let thumbnailSize: CGFloat = 100
 
-        return max(height - overhead, minimumSize)
+    /// Current position of the selected image (1-based for UI)
+    private var currentPosition: Int? {
+        guard let selected = selectedPair,
+              let index = pairs.firstIndex(of: selected) else {
+            return nil
+        }
+        return index + 1  // 1-based instead of 0-based
+    }
+
+    /// Total number of images (only JPEGs, not counting RAWs)
+    private var totalImages: Int {
+        return pairs.count
     }
 
     var body: some View {
@@ -52,7 +51,7 @@ struct ThumbnailBarView: View {
                 thumbnailContentView
             }
         }
-        .frame(height: height) // Adjustable height for thumbnail area
+        .frame(height: fixedHeight) // Fixed height for thumbnail area
         .frame(maxWidth: .infinity)
         .background(Color.black)
     }
@@ -69,31 +68,64 @@ struct ThumbnailBarView: View {
     // MARK: - Thumbnail Content
     private var thumbnailContentView: some View {
         thumbnailScrollView
+            .overlay(alignment: .topTrailing) {
+                // Position indicator in the top-right corner
+                positionIndicator
+                    .padding([.top, .trailing], 12)
+            }
     }
     
-    // MARK: - Thumbnail ScrollView
-    private var thumbnailScrollView: some View {
-        ScrollView(.horizontal, showsIndicators: true) {
-            // VStack to add vertical spacing without affecting scrollbar
-            VStack {
-                Spacer()
-                    .frame(height: 20)
+    // MARK: - Position Indicator
 
-                LazyHStack(spacing: 12) {
-                    ForEach(pairs) { pair in
-                        thumbnailItem(for: pair)
-                            .onTapGesture {
-                                handleThumbnailClick(for: pair)
-                            }
-                    }
-                }
-                .padding(.horizontal)
-
-                Spacer()
-                    .frame(height: 20)
+    /// Shows current image position (e.g., "Bild 5 von 23")
+    private var positionIndicator: some View {
+        Group {
+            if let position = currentPosition {
+                Text("Bild \(position) von \(totalImages)")
+                    .font(.caption)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(.black.opacity(0.6))
+                    .foregroundStyle(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
         }
-        .scrollIndicators(.visible) // Explicitly show scrollbar
+    }
+
+    // MARK: - Thumbnail ScrollView
+    private var thumbnailScrollView: some View {
+        ScrollViewReader { scrollProxy in
+            ScrollView(.horizontal, showsIndicators: true) {
+                // VStack to add vertical spacing without affecting scrollbar
+                VStack {
+                    Spacer()
+                        .frame(height: 8)
+
+                    LazyHStack(spacing: 12) {
+                        ForEach(pairs) { pair in
+                            thumbnailItem(for: pair)
+                                .id(pair.id)  // Explizite ID für scrollTo()
+                                .onTapGesture {
+                                    handleThumbnailClick(for: pair)
+                                }
+                        }
+                    }
+                    .padding(.horizontal)
+
+                    Spacer()
+                        .frame(height: 8)
+                }
+            }
+            .scrollIndicators(.visible) // Explicitly show scrollbar
+            .onChange(of: selectedPair) { oldValue, newValue in
+                // Auto-scroll zu ausgewähltem Thumbnail wenn Selection sich ändert
+                if let pair = newValue {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        scrollProxy.scrollTo(pair.id, anchor: .center)
+                    }
+                }
+            }
+        }
     }
     
     // MARK: - Thumbnail Item
@@ -319,8 +351,7 @@ struct ThumbnailBarView: View {
         pairs: [],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
-        onRenameSelected: { },
-        height: .constant(180)
+        onRenameSelected: { }
     )
 }
 
@@ -345,7 +376,6 @@ struct ThumbnailBarView: View {
         ],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
-        onRenameSelected: { },
-        height: .constant(180)
+        onRenameSelected: { }
     )
 }
