@@ -73,27 +73,38 @@ struct ThumbnailBarView: View {
     
     // MARK: - Thumbnail ScrollView
     private var thumbnailScrollView: some View {
-        ScrollView(.horizontal, showsIndicators: true) {
-            // VStack to add vertical spacing without affecting scrollbar
-            VStack {
-                Spacer()
-                    .frame(height: 20)
+        ScrollViewReader { scrollProxy in
+            ScrollView(.horizontal, showsIndicators: true) {
+                // VStack to add vertical spacing without affecting scrollbar
+                VStack {
+                    Spacer()
+                        .frame(height: 20)
 
-                LazyHStack(spacing: 12) {
-                    ForEach(pairs) { pair in
-                        thumbnailItem(for: pair)
-                            .onTapGesture {
-                                handleThumbnailClick(for: pair)
-                            }
+                    LazyHStack(spacing: 12) {
+                        ForEach(pairs) { pair in
+                            thumbnailItem(for: pair)
+                                .id(pair.id)  // Explizite ID für scrollTo()
+                                .onTapGesture {
+                                    handleThumbnailClick(for: pair)
+                                }
+                        }
+                    }
+                    .padding(.horizontal)
+
+                    Spacer()
+                        .frame(height: 20)
+                }
+            }
+            .scrollIndicators(.visible) // Explicitly show scrollbar
+            .onChange(of: selectedPair) { oldValue, newValue in
+                // Auto-scroll zu ausgewähltem Thumbnail wenn Selection sich ändert
+                if let pair = newValue {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        scrollProxy.scrollTo(pair.id, anchor: .center)
                     }
                 }
-                .padding(.horizontal)
-
-                Spacer()
-                    .frame(height: 20)
             }
         }
-        .scrollIndicators(.visible) // Explicitly show scrollbar
     }
     
     // MARK: - Thumbnail Item
