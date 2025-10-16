@@ -24,6 +24,26 @@ struct ThumbnailBarView: View {
     // NEW: State for last click (for shift-selection)
     @State private var lastClickedPairID: UUID? = nil
 
+    // MARK: - Computed Properties
+
+    /// Dynamically calculates thumbnail size based on available height
+    /// Subtracts overhead for texts, spacing, and padding
+    private var thumbnailSize: CGFloat {
+        // Overhead calculation:
+        // - padding top: 20px
+        // - padding bottom: 20px
+        // - VStack spacing (2x): 12px
+        // - Text 1 (filename): ~14px
+        // - Text 2 (RAW status): ~14px
+        // Total: 80px
+        let overhead: CGFloat = 80
+
+        // Minimum size to prevent too small thumbnails
+        let minimumSize: CGFloat = 40
+
+        return max(height - overhead, minimumSize)
+    }
+
     var body: some View {
         VStack {
             if pairs.isEmpty {
@@ -54,17 +74,26 @@ struct ThumbnailBarView: View {
     // MARK: - Thumbnail ScrollView
     private var thumbnailScrollView: some View {
         ScrollView(.horizontal, showsIndicators: true) {
-            LazyHStack(spacing: 12) {
-                ForEach(pairs) { pair in
-                    thumbnailItem(for: pair)
-                        .onTapGesture {
-                            handleThumbnailClick(for: pair)
-                        }
+            // VStack to add vertical spacing without affecting scrollbar
+            VStack {
+                Spacer()
+                    .frame(height: 20)
+
+                LazyHStack(spacing: 12) {
+                    ForEach(pairs) { pair in
+                        thumbnailItem(for: pair)
+                            .onTapGesture {
+                                handleThumbnailClick(for: pair)
+                            }
+                    }
                 }
+                .padding(.horizontal)
+
+                Spacer()
+                    .frame(height: 20)
             }
-            .padding(.horizontal)
-            .padding(.bottom, 16)
         }
+        .scrollIndicators(.visible) // Explicitly show scrollbar
     }
     
     // MARK: - Thumbnail Item
@@ -83,7 +112,7 @@ struct ThumbnailBarView: View {
                             .scaleEffect(0.5)
                     }
             }
-            .frame(width: 100, height: 100)
+            .frame(width: thumbnailSize, height: thumbnailSize)
             .clipped()
             .clipShape(RoundedRectangle(cornerRadius: 6))
             .overlay {
@@ -95,12 +124,15 @@ struct ThumbnailBarView: View {
                     )
             }
             .overlay(alignment: .topTrailing) {
-                // Stern-Badge für TOP-getaggte Bilder
+                // Stern-Badge für TOP-getaggte Bilder (dynamically scaled)
                 if pair.hasTopTag {
+                    let badgeSize = max(12, min(thumbnailSize * 0.14, 18))
+                    let badgePadding = max(4, min(thumbnailSize * 0.06, 8))
+
                     Image(systemName: "star.fill")
-                        .font(.system(size: 14))
+                        .font(.system(size: badgeSize))
                         .foregroundStyle(.yellow)
-                        .padding(6)
+                        .padding(badgePadding)
                         .background(
                             Circle()
                                 .fill(.black.opacity(0.5))
@@ -113,14 +145,14 @@ struct ThumbnailBarView: View {
             Text(pair.jpegURL.deletingPathExtension().lastPathComponent)
                 .font(.caption2)
                 .lineLimit(1)
-                .frame(maxWidth: 100)
+                .frame(maxWidth: thumbnailSize)
 
             // RAW status
             Text(pair.rawURL != nil ? "RAW✅" : "RAW🚫")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: 110)
+        .frame(maxWidth: thumbnailSize + 10)
         // NEW: Context menu for renaming
         .contextMenu {
             contextMenuItems(for: pair)
