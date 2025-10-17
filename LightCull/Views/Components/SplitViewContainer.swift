@@ -56,6 +56,7 @@ struct SplitViewContainer: View {
                         .padding(8)
                 }
                 .frame(width: geometry.size.width / 2)
+                .clipped()  // Verhindert Überlappung beim Zoomen
 
                 // DIVIDER: Visual separation
                 Divider()
@@ -88,6 +89,7 @@ struct SplitViewContainer: View {
                         .padding(8)
                 }
                 .frame(width: geometry.size.width / 2)
+                .clipped()  // Verhindert Überlappung beim Zoomen
             }
         }
     }
