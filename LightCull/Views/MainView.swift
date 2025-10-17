@@ -16,6 +16,11 @@ struct MainView: View {
     // NEW: Multi-selection for batch operations
     @State private var selectedPairs: Set<UUID> = []
 
+    // NEW: Split view mode state
+    @State private var isSplitViewActive: Bool = false
+    @State private var leftImagePair: ImagePair? = nil   // Reference image (fixed)
+    @State private var rightImagePair: ImagePair? = nil  // Comparison image (changeable)
+
     // NEW: State for rename sheet
     @State private var showRenameSheet: Bool = false
 
@@ -73,17 +78,33 @@ struct MainView: View {
             // CONTENT AREA: Image preview on top + thumbnails on bottom
             ZStack {
                 VStack(spacing: 0) {
-                    // IMPORTANT: ViewModel is passed through here!
-                    ImageViewerView(
-                        selectedImagePair: selectedPair,
-                        viewModel: imageViewModel,
-                        onPreviousImage: selectPreviousImage,
-                        onNextImage: selectNextImage,
-                        onToggleTag: handleToggleTag,  // NEW: Callback for tag toggle
-                        onDeleteImage: handleDelete,  // NEW: Callback for delete
-                        onArchiveImage: handleArchive,  // NEW: Callback for archive
-                        onOuttakeImage: handleOuttake  // NEW: Callback for outtake
-                    )
+                    // CONDITIONAL: Show split view or single view based on mode
+                    if isSplitViewActive {
+                        // SPLIT VIEW MODE: Two images side-by-side
+                        SplitViewContainer(
+                            leftImagePair: leftImagePair,
+                            rightImagePair: rightImagePair,
+                            viewModel: imageViewModel,  // Shared ViewModel = synchronized zoom/pan
+                            onPreviousRightImage: selectPreviousRightImage,
+                            onNextRightImage: selectNextRightImage,
+                            onToggleTag: handleToggleTagForRightImage,
+                            onDeleteImage: handleDeleteForRightImage,
+                            onArchiveImage: handleArchiveForRightImage,
+                            onOuttakeImage: handleOuttakeForRightImage
+                        )
+                    } else {
+                        // SINGLE VIEW MODE: Original single image viewer
+                        ImageViewerView(
+                            selectedImagePair: selectedPair,
+                            viewModel: imageViewModel,
+                            onPreviousImage: selectPreviousImage,
+                            onNextImage: selectNextImage,
+                            onToggleTag: handleToggleTag,
+                            onDeleteImage: handleDelete,
+                            onArchiveImage: handleArchive,
+                            onOuttakeImage: handleOuttake
+                        )
+                    }
 
                     // NEW: Conditional rendering - only show when showThumbnailBar is true
                     if showThumbnailBar {
@@ -94,6 +115,9 @@ struct MainView: View {
                             pairs: pairs,
                             selectedPair: $selectedPair,
                             selectedPairs: $selectedPairs,
+                            selectedLeftPair: $leftImagePair,
+                            selectedRightPair: $rightImagePair,
+                            isSplitViewActive: isSplitViewActive,
                             onRenameSelected: handleRenameButtonClicked
                         )
                         .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -120,6 +144,11 @@ struct MainView: View {
                     Button("Toggle Thumbnail Bar") { showThumbnailBar.toggle() }
                         .keyboardShortcut("t", modifiers: [.command, .option])
                         .hidden()
+
+                    // NEW: Split view toggle
+                    Button("Toggle Split View") { toggleSplitView() }
+                        .keyboardShortcut("s", modifiers: .command)
+                        .hidden()
                 }
                 .frame(width: 0, height: 0)
             }
@@ -141,6 +170,12 @@ struct MainView: View {
 
                         // NEW: Thumbnail bar toggle button
                         thumbnailBarToggleButton
+
+                        Divider()
+                            .frame(height: 20)
+
+                        // NEW: Split view toggle button
+                        splitViewToggleButton
 
                         Divider()
                             .frame(height: 20)
@@ -217,6 +252,21 @@ struct MainView: View {
         .help("Toggle thumbnail bar (⌘⌥T)")
     }
 
+    // MARK: - Split View Toggle (NEW!)
+
+    /// Split view toggle button for the toolbar
+    private var splitViewToggleButton: some View {
+        Button(action: {
+            toggleSplitView()
+        }) {
+            Image(systemName: "rectangle.split.2x1")
+                .imageScale(.large)
+                .foregroundStyle(isSplitViewActive ? .blue : .primary)
+        }
+        .disabled(selectedPair == nil && !isSplitViewActive)
+        .help("Split View (⌘ S)")
+    }
+
     // MARK: - Info Button & Shortcuts Overlay (NEW!)
 
     /// Info button for the toolbar
@@ -285,7 +335,8 @@ struct MainView: View {
                         ])
 
                         shortcutCategory(title: "View", shortcuts: [
-                            ("⌘ ⌥ T", "Toggle thumbnail bar")
+                            ("⌘ ⌥ T", "Toggle thumbnail bar"),
+                            ("⌘ S", "Toggle split view")
                         ])
 
                         shortcutCategory(title: "Editing", shortcuts: [
@@ -931,6 +982,191 @@ struct MainView: View {
             return
         }
         selectedPair = pairs[currentIndex + 1]
+    }
+
+    // MARK: - Split View Navigation (NEW!)
+
+    /// Navigates to the previous image (right side in split view)
+    private func selectPreviousRightImage() {
+        guard let current = rightImagePair,
+              let currentIndex = pairs.firstIndex(of: current),
+              currentIndex > 0 else {
+            return
+        }
+        rightImagePair = pairs[currentIndex - 1]
+    }
+
+    /// Navigates to the next image (right side in split view)
+    private func selectNextRightImage() {
+        guard let current = rightImagePair,
+              let currentIndex = pairs.firstIndex(of: current),
+              currentIndex < pairs.count - 1 else {
+            return
+        }
+        rightImagePair = pairs[currentIndex + 1]
+    }
+
+    // MARK: - Split View Toggle Logic (NEW!)
+
+    /// Toggles split view mode on/off
+    private func toggleSplitView() {
+        if isSplitViewActive {
+            // Deactivate: return to single view with right image
+            deactivateSplitView()
+        } else {
+            // Activate: set current image as left reference
+            activateSplitView()
+        }
+    }
+
+    /// Activates split view mode
+    private func activateSplitView() {
+        guard let current = selectedPair else {
+            // No image selected - cannot activate
+            Logger.ui.notice("Cannot activate split view - no image selected")
+            return
+        }
+
+        Logger.ui.info("Activating split view mode")
+
+        // Set left (reference) image to current selection
+        leftImagePair = current
+
+        // Set right (comparison) image to same as left initially
+        rightImagePair = current
+
+        // Clear single selection
+        selectedPair = nil
+
+        // Clear multi-selection (not compatible with split view)
+        selectedPairs.removeAll()
+
+        // Activate split view
+        isSplitViewActive = true
+    }
+
+    /// Deactivates split view mode
+    private func deactivateSplitView() {
+        Logger.ui.info("Deactivating split view mode")
+
+        // Keep the right image as the selected image
+        selectedPair = rightImagePair
+
+        // Clear split view pairs
+        leftImagePair = nil
+        rightImagePair = nil
+
+        // Deactivate split view
+        isSplitViewActive = false
+    }
+
+    // MARK: - Split View Action Handlers (NEW!)
+
+    /// Handles tag toggle for the right image in split view
+    private func handleToggleTagForRightImage() {
+        guard let currentPair = rightImagePair else {
+            return
+        }
+
+        // Call ViewModel to toggle tag
+        imageViewModel.toggleTopTag(for: currentPair) { updatedPair in
+            DispatchQueue.main.async {
+                // Update the right image pair
+                rightImagePair = updatedPair
+                // Also update in the pairs array
+                updateImagePair(updatedPair)
+            }
+        }
+    }
+
+    /// Handles delete for the right image in split view
+    private func handleDeleteForRightImage() {
+        guard let currentPair = rightImagePair,
+              let folder = folderURL else {
+            return
+        }
+
+        let currentIndex: Int? = pairs.firstIndex(of: currentPair)
+
+        imageViewModel.deleteImagePair(pair: currentPair, in: folder) { success in
+            if success {
+                Logger.ui.info("Delete successful (split view)")
+                rescanFolderWithoutThumbnails(folder) {
+                    selectNextRightImageAfterDelete(deletedIndex: currentIndex)
+                }
+            } else {
+                Logger.ui.error("Delete failed (split view)")
+            }
+        }
+    }
+
+    /// Handles archive for the right image in split view
+    private func handleArchiveForRightImage() {
+        guard let currentPair = rightImagePair,
+              let folder = folderURL else {
+            return
+        }
+
+        let currentIndex: Int? = pairs.firstIndex(of: currentPair)
+
+        imageViewModel.archiveImagePair(pair: currentPair, in: folder) { success in
+            if success {
+                Logger.ui.info("Archive successful (split view)")
+                rescanFolderWithoutThumbnails(folder) {
+                    selectNextRightImageAfterDelete(deletedIndex: currentIndex)
+                }
+            } else {
+                Logger.ui.error("Archive failed (split view)")
+            }
+        }
+    }
+
+    /// Handles outtake for the right image in split view
+    private func handleOuttakeForRightImage() {
+        guard let currentPair = rightImagePair,
+              let folder = folderURL else {
+            return
+        }
+
+        let currentIndex: Int? = pairs.firstIndex(of: currentPair)
+
+        imageViewModel.outtakeImagePair(pair: currentPair, in: folder) { success in
+            if success {
+                Logger.ui.info("Outtake successful (split view)")
+                rescanFolderWithoutThumbnails(folder) {
+                    selectNextRightImageAfterDelete(deletedIndex: currentIndex)
+                }
+            } else {
+                Logger.ui.error("Outtake failed (split view)")
+            }
+        }
+    }
+
+    /// Selects the next right image after a delete in split view
+    private func selectNextRightImageAfterDelete(deletedIndex: Int?) {
+        // Are there even any images left?
+        if pairs.isEmpty {
+            // No more images - deactivate split view
+            deactivateSplitView()
+            Logger.ui.info("No more images - deactivating split view")
+            return
+        }
+
+        // Did we have an index?
+        guard let deletedIndex = deletedIndex else {
+            // No index - just select the first image
+            rightImagePair = pairs.first
+            return
+        }
+
+        // Now we need to decide: Next or previous image?
+        if deletedIndex >= pairs.count {
+            // Deleted image was the last - select new last image
+            rightImagePair = pairs.last
+        } else {
+            // Select image at same position (what was next is now at deleted position)
+            rightImagePair = pairs[deletedIndex]
+        }
     }
     
     // MARK: - Metadata Loading

@@ -30,6 +30,9 @@ struct ImageViewerView: View {
     // NEW: Callback for outtake
     let onOuttakeImage: () -> Void
 
+    // NEW: Option to disable keyboard shortcuts (for split view left side)
+    var disableKeyboardShortcuts: Bool = false
+
     var body: some View {
         ZStack {
             // Main content
@@ -45,49 +48,51 @@ struct ImageViewerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color(.windowBackgroundColor))
 
-            // Invisible buttons for keyboard shortcuts
-            VStack {
-                Button("Zoom In") { viewModel.zoomIn() }
-                    .keyboardShortcut("+", modifiers: .command)
-                    .hidden()
+            // Invisible buttons for keyboard shortcuts (conditionally enabled)
+            if !disableKeyboardShortcuts {
+                VStack {
+                    Button("Zoom In") { viewModel.zoomIn() }
+                        .keyboardShortcut("+", modifiers: .command)
+                        .hidden()
 
-                Button("Zoom Out") { viewModel.zoomOut() }
-                    .keyboardShortcut("-", modifiers: .command)
-                    .hidden()
+                    Button("Zoom Out") { viewModel.zoomOut() }
+                        .keyboardShortcut("-", modifiers: .command)
+                        .hidden()
 
-                Button("Reset Zoom") { viewModel.resetZoom() }
-                    .keyboardShortcut("0", modifiers: .command)
-                    .hidden()
+                    Button("Reset Zoom") { viewModel.resetZoom() }
+                        .keyboardShortcut("0", modifiers: .command)
+                        .hidden()
 
-                Button("Previous Image") { onPreviousImage() }
-                    .keyboardShortcut(.leftArrow, modifiers: [])
-                    .hidden()
+                    Button("Previous Image") { onPreviousImage() }
+                        .keyboardShortcut(.leftArrow, modifiers: [])
+                        .hidden()
 
-                Button("Next Image") { onNextImage() }
-                    .keyboardShortcut(.rightArrow, modifiers: [])
-                    .hidden()
+                    Button("Next Image") { onNextImage() }
+                        .keyboardShortcut(.rightArrow, modifiers: [])
+                        .hidden()
 
-                // NEW: Keyboard shortcut for tag toggle
-                Button("Toggle TOP Tag") { onToggleTag() }
-                    .keyboardShortcut("t", modifiers: [])
-                    .hidden()
+                    // NEW: Keyboard shortcut for tag toggle
+                    Button("Toggle TOP Tag") { onToggleTag() }
+                        .keyboardShortcut("t", modifiers: [])
+                        .hidden()
 
-                // NEW: Keyboard shortcut for delete
-                Button("Delete Image") { onDeleteImage() }
-                    .keyboardShortcut("d", modifiers: [])
-                    .hidden()
+                    // NEW: Keyboard shortcut for delete
+                    Button("Delete Image") { onDeleteImage() }
+                        .keyboardShortcut("d", modifiers: [])
+                        .hidden()
 
-                // NEW: Keyboard shortcut for archive
-                Button("Archive Image") { onArchiveImage() }
-                    .keyboardShortcut("a", modifiers: [])
-                    .hidden()
+                    // NEW: Keyboard shortcut for archive
+                    Button("Archive Image") { onArchiveImage() }
+                        .keyboardShortcut("a", modifiers: [])
+                        .hidden()
 
-                // NEW: Keyboard shortcut for outtake
-                Button("Outtake Image") { onOuttakeImage() }
-                    .keyboardShortcut("o", modifiers: [])
-                    .hidden()
+                    // NEW: Keyboard shortcut for outtake
+                    Button("Outtake Image") { onOuttakeImage() }
+                        .keyboardShortcut("o", modifiers: [])
+                        .hidden()
+                }
+                .frame(width: 0, height: 0)
             }
-            .frame(width: 0, height: 0)
         }
     }
     

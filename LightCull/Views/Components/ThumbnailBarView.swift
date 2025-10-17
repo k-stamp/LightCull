@@ -15,6 +15,11 @@ struct ThumbnailBarView: View {
     // NEW: Multi-selection for batch operations
     @Binding var selectedPairs: Set<UUID>
 
+    // NEW: Split view selections
+    @Binding var selectedLeftPair: ImagePair?   // Blue border (reference)
+    @Binding var selectedRightPair: ImagePair?  // Orange border (comparison)
+    let isSplitViewActive: Bool
+
     // NEW: Callback for context menu "Rename"
     let onRenameSelected: () -> Void
 
@@ -118,8 +123,16 @@ struct ThumbnailBarView: View {
             }
             .scrollIndicators(.visible) // Explicitly show scrollbar
             .onChange(of: selectedPair) { oldValue, newValue in
-                // Auto-scroll zu ausgewähltem Thumbnail wenn Selection sich ändert
-                if let pair = newValue {
+                // Auto-scroll zu ausgewähltem Thumbnail wenn Selection sich ändert (single view mode)
+                if !isSplitViewActive, let pair = newValue {
+                    withAnimation(.easeInOut(duration: 0.3)) {
+                        scrollProxy.scrollTo(pair.id, anchor: .center)
+                    }
+                }
+            }
+            .onChange(of: selectedRightPair) { oldValue, newValue in
+                // Auto-scroll zu ausgewähltem Thumbnail wenn Right Selection sich ändert (split view mode)
+                if isSplitViewActive, let pair = newValue {
                     withAnimation(.easeInOut(duration: 0.3)) {
                         scrollProxy.scrollTo(pair.id, anchor: .center)
                     }
@@ -194,35 +207,64 @@ struct ThumbnailBarView: View {
     // MARK: - Border Logic
 
     /// Returns the border color for a thumbnail
-    /// Blue = multi-selection, accent = single-selection, gray = not selected
+    /// In split view: Blue = left (reference), Orange = right (comparison)
+    /// In single view: Blue = multi-selection, accent = single-selection, gray = not selected
     private func getBorderColor(for pair: ImagePair) -> Color {
-        // Is this pair in the multi-selection?
-        let isMultiSelected: Bool = selectedPairs.contains(pair.id)
-
-        if isMultiSelected {
-            // Multi-selection: blue border
-            return Color.blue
-        } else if selectedPair?.id == pair.id {
-            // Single-selection: accent color
-            return Color.accentColor
+        if isSplitViewActive {
+            // SPLIT VIEW MODE: Show left and right selections
+            if selectedLeftPair?.id == pair.id {
+                // Left (reference) image: blue border
+                return Color.blue
+            } else if selectedRightPair?.id == pair.id {
+                // Right (comparison) image: orange border
+                return Color.orange
+            } else {
+                // Not selected: gray separator
+                return Color(.separatorColor)
+            }
         } else {
-            // Not selected: gray separator
-            return Color(.separatorColor)
+            // SINGLE VIEW MODE: Existing logic
+            let isMultiSelected: Bool = selectedPairs.contains(pair.id)
+
+            if isMultiSelected {
+                // Multi-selection: blue border
+                return Color.blue
+            } else if selectedPair?.id == pair.id {
+                // Single-selection: accent color
+                return Color.accentColor
+            } else {
+                // Not selected: gray separator
+                return Color(.separatorColor)
+            }
         }
     }
 
     /// Returns the border width for a thumbnail
     private func getBorderWidth(for pair: ImagePair) -> CGFloat {
-        // Is this pair selected (either single or multi)?
-        let isMultiSelected: Bool = selectedPairs.contains(pair.id)
-        let isSingleSelected: Bool = selectedPair?.id == pair.id
+        if isSplitViewActive {
+            // SPLIT VIEW MODE: Check left or right selection
+            let isLeftSelected: Bool = selectedLeftPair?.id == pair.id
+            let isRightSelected: Bool = selectedRightPair?.id == pair.id
 
-        if isMultiSelected || isSingleSelected {
-            // Selected: thicker border
-            return 2.0
+            if isLeftSelected || isRightSelected {
+                // Selected: thicker border
+                return 3.0  // Slightly thicker for split view
+            } else {
+                // Not selected: thin border
+                return 0.5
+            }
         } else {
-            // Not selected: thin border
-            return 0.5
+            // SINGLE VIEW MODE: Existing logic
+            let isMultiSelected: Bool = selectedPairs.contains(pair.id)
+            let isSingleSelected: Bool = selectedPair?.id == pair.id
+
+            if isMultiSelected || isSingleSelected {
+                // Selected: thicker border
+                return 2.0
+            } else {
+                // Not selected: thin border
+                return 0.5
+            }
         }
     }
 
@@ -241,20 +283,26 @@ struct ThumbnailBarView: View {
 
     /// Called when a thumbnail is clicked
     private func handleThumbnailClick(for pair: ImagePair) {
-        // Check which modifier keys are pressed
-        // NSEvent.modifierFlags is a macOS feature to check currently pressed keys
-        let isCmdPressed: Bool = NSEvent.modifierFlags.contains(.command)
-        let isShiftPressed: Bool = NSEvent.modifierFlags.contains(.shift)
-
-        if isShiftPressed {
-            // SHIFT is pressed: range selection (like in Finder)
-            handleRangeSelection(to: pair)
-        } else if isCmdPressed {
-            // CMD is pressed: multi-selection toggle
-            handleMultiSelectionToggle(for: pair)
+        if isSplitViewActive {
+            // SPLIT VIEW MODE: Clicking updates the right (comparison) image
+            selectedRightPair = pair
         } else {
-            // No modifier: normal single-selection
-            handleSingleSelection(for: pair)
+            // SINGLE VIEW MODE: Existing logic with modifier keys
+            // Check which modifier keys are pressed
+            // NSEvent.modifierFlags is a macOS feature to check currently pressed keys
+            let isCmdPressed: Bool = NSEvent.modifierFlags.contains(.command)
+            let isShiftPressed: Bool = NSEvent.modifierFlags.contains(.shift)
+
+            if isShiftPressed {
+                // SHIFT is pressed: range selection (like in Finder)
+                handleRangeSelection(to: pair)
+            } else if isCmdPressed {
+                // CMD is pressed: multi-selection toggle
+                handleMultiSelectionToggle(for: pair)
+            } else {
+                // No modifier: normal single-selection
+                handleSingleSelection(for: pair)
+            }
         }
 
         // Save last click (for shift-selection)
@@ -351,6 +399,9 @@ struct ThumbnailBarView: View {
         pairs: [],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
+        selectedLeftPair: .constant(nil),
+        selectedRightPair: .constant(nil),
+        isSplitViewActive: false,
         onRenameSelected: { }
     )
 }
@@ -369,13 +420,16 @@ struct ThumbnailBarView: View {
                 hasTopTag: false
             ),
             ImagePair(
-                jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreTypes.bundle/Contents/Resources/JPEG.icns"),
+                jpegURL: URL(fileURLWithPath: "/System/Library/CoreServices/CoreServices.bundle/Contents/Resources/JPEG.icns"),
                 rawURL: URL(fileURLWithPath: "/mock/image3.arw"),
                 hasTopTag: false
             )
         ],
         selectedPair: .constant(nil),
         selectedPairs: .constant([]),
+        selectedLeftPair: .constant(nil),
+        selectedRightPair: .constant(nil),
+        isSplitViewActive: false,
         onRenameSelected: { }
     )
 }
