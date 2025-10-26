@@ -46,7 +46,11 @@ struct ImageViewerView: View {
                 }
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
+            #if os(macOS)
             .background(Color(.windowBackgroundColor))
+            #elseif os(iOS)
+            .background(Color(.systemBackground))
+            #endif
 
             // Invisible buttons for keyboard shortcuts (conditionally enabled)
             if !disableKeyboardShortcuts {
@@ -145,24 +149,30 @@ struct ImageViewerView: View {
                     viewModel.adjustPanBounds(imageSize: availableSize, viewSize: availableSize)
                 }
 
-            // Overlay für kombinierte Zoom- und Pan-Gesten
+            // Overlay für kombinierte Zoom- und Pan-Gesten (plattformübergreifend)
             // Immer aktiv, damit Zoom jederzeit funktioniert
-            ZoomAndPanGestureView { magnification in
-                // Bei jedem Magnify-Event: Zoom anpassen
-                viewModel.handleMagnification(magnification)
-            } onScrollDelta: { deltaX, deltaY in
-                // Bei jedem Scroll-Event: Delta auf aktuelle Position anwenden
-                // (wird im ViewModel ignoriert wenn nicht gezoomt)
-                viewModel.applyScrollDelta(
-                    deltaX: deltaX,
-                    deltaY: deltaY,
-                    imageSize: availableSize,
-                    viewSize: availableSize
-                )
+            CrossPlatformGestureView(
+                onMagnify: { magnification in
+                    // Bei jedem Magnify-Event: Zoom anpassen
+                    viewModel.handleMagnification(magnification)
+                },
+                onScrollDelta: { deltaX, deltaY in
+                    // Bei jedem Scroll-Event: Delta auf aktuelle Position anwenden
+                    // (wird im ViewModel ignoriert wenn nicht gezoomt)
+                    viewModel.applyScrollDelta(
+                        deltaX: deltaX,
+                        deltaY: deltaY,
+                        imageSize: availableSize,
+                        viewSize: availableSize
+                    )
+                }
+            ) {
+                // Transparent overlay to capture gestures
+                Color.clear
             }
             // WICHTIG: Frame muss gesetzt werden, damit das View Events empfangen kann!
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            // Allow the view to receive mouse/trackpad events
+            // Allow the view to receive mouse/trackpad/touch events
             .allowsHitTesting(true)
         }
     }

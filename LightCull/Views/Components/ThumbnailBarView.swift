@@ -6,7 +6,10 @@
 //
 
 import SwiftUI
+
+#if os(macOS)
 import AppKit  // For NSEvent.modifierFlags (CMD key detection)
+#endif
 
 struct ThumbnailBarView: View {
     let pairs: [ImagePair]
@@ -151,7 +154,11 @@ struct ThumbnailBarView: View {
                     .aspectRatio(contentMode: .fill)
             } placeholder: {
                 Rectangle()
+                    #if os(macOS)
                     .fill(Color(.quaternaryLabelColor))
+                    #elseif os(iOS)
+                    .fill(Color(.quaternaryLabel))
+                    #endif
                     .overlay {
                         ProgressView()
                             .scaleEffect(0.5)
@@ -220,7 +227,11 @@ struct ThumbnailBarView: View {
                 return Color.orange
             } else {
                 // Not selected: gray separator
+                #if os(macOS)
                 return Color(.separatorColor)
+                #elseif os(iOS)
+                return Color(.separator)
+                #endif
             }
         } else {
             // SINGLE VIEW MODE: Existing logic
@@ -234,7 +245,11 @@ struct ThumbnailBarView: View {
                 return Color.accentColor
             } else {
                 // Not selected: gray separator
+                #if os(macOS)
                 return Color(.separatorColor)
+                #elseif os(iOS)
+                return Color(.separator)
+                #endif
             }
         }
     }
@@ -288,6 +303,7 @@ struct ThumbnailBarView: View {
             selectedRightPair = pair
         } else {
             // SINGLE VIEW MODE: Existing logic with modifier keys
+            #if os(macOS)
             // Check which modifier keys are pressed
             // NSEvent.modifierFlags is a macOS feature to check currently pressed keys
             let isCmdPressed: Bool = NSEvent.modifierFlags.contains(.command)
@@ -303,6 +319,11 @@ struct ThumbnailBarView: View {
                 // No modifier: normal single-selection
                 handleSingleSelection(for: pair)
             }
+            #elseif os(iOS)
+            // iOS: No modifier key detection - simple single selection
+            // (Multi-selection can be implemented via long-press gesture in the future)
+            handleSingleSelection(for: pair)
+            #endif
         }
 
         // Save last click (for shift-selection)

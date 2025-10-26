@@ -77,6 +77,7 @@ class FinderTagService {
     /// - Parameter url: the URL of the file
     /// - Returns: array with tag names, or nil on error
     private func getTags(from url: URL) -> [String]? {
+        #if os(macOS)
         // URLResourceValues is a container for file metadata
         // IMPORTANT: The security-scoped access must come from the FOLDER (not from the file)
         // The folder access is started in MainView.handleFolderSelection()
@@ -86,6 +87,12 @@ class FinderTagService {
         }
 
         return resourceValues.tagNames
+        #elseif os(iOS)
+        // Finder tags are not available on iOS
+        // Return empty array to indicate no tags
+        Logger.tagging.debug("Finder tags not supported on iOS: \(url.lastPathComponent)")
+        return []
+        #endif
     }
     
     
@@ -95,6 +102,7 @@ class FinderTagService {
     ///     - url: the URL of the file
     /// - Returns: true if successful, false on error
     private func setTags(_ tags: [String], to url: URL) -> Bool {
+        #if os(macOS)
         var resourceValues = URLResourceValues()
         resourceValues.tagNames = tags
 
@@ -114,6 +122,11 @@ class FinderTagService {
             Logger.tagging.error("Error writing tags to \(url.lastPathComponent): \(error.localizedDescription)")
             return false
         }
+        #elseif os(iOS)
+        // Finder tags are not available on iOS
+        Logger.tagging.debug("Finder tags not supported on iOS - skipping write for: \(url.lastPathComponent)")
+        return true  // Return true to avoid errors in the UI
+        #endif
     }
     
 }
