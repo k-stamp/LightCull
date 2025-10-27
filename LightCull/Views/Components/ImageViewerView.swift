@@ -165,6 +165,10 @@ struct ImageViewerView: View {
                         imageSize: availableSize,
                         viewSize: availableSize
                     )
+                },
+                onDoubleTap: {
+                    // Bei Doppeltipp: Zoom zurücksetzen (nur iOS)
+                    viewModel.resetZoom()
                 }
             ) {
                 // Transparent overlay to capture gestures

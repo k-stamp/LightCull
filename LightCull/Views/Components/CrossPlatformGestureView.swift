@@ -18,15 +18,18 @@ struct CrossPlatformGestureView<Content: View>: View {
     let content: Content
     let onMagnify: (CGFloat) -> Void
     let onScrollDelta: (CGFloat, CGFloat) -> Void
+    let onDoubleTap: (() -> Void)?
 
     init(
         onMagnify: @escaping (CGFloat) -> Void,
         onScrollDelta: @escaping (CGFloat, CGFloat) -> Void,
+        onDoubleTap: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.content = content()
         self.onMagnify = onMagnify
         self.onScrollDelta = onScrollDelta
+        self.onDoubleTap = onDoubleTap
     }
 
     var body: some View {
@@ -47,7 +50,8 @@ struct CrossPlatformGestureView<Content: View>: View {
         IOSGestureView(
             content: content,
             onMagnify: onMagnify,
-            onScrollDelta: onScrollDelta
+            onScrollDelta: onScrollDelta,
+            onDoubleTap: onDoubleTap
         )
         #endif
     }
@@ -61,6 +65,7 @@ struct IOSGestureView<Content: View>: View {
     let content: Content
     let onMagnify: (CGFloat) -> Void
     let onScrollDelta: (CGFloat, CGFloat) -> Void
+    let onDoubleTap: (() -> Void)?
 
     @State private var lastMagnification: CGFloat = 1.0
     @State private var lastDragTranslation: CGSize = .zero
@@ -69,6 +74,13 @@ struct IOSGestureView<Content: View>: View {
         content
             // WICHTIG: contentShape macht den gesamten Bereich touch-sensitiv
             .contentShape(Rectangle())
+            // Doppeltipp zum Zurücksetzen des Zooms (nur auf iOS)
+            .onTapGesture(count: 2) {
+                #if DEBUG
+                print("🔍 iOS Double-Tap - Reset Zoom")
+                #endif
+                onDoubleTap?()
+            }
             .gesture(
                 // Magnification gesture for pinch-to-zoom
                 // WICHTIG: Wir verwenden .simultaneously statt .gesture, damit
@@ -135,6 +147,9 @@ struct IOSGestureView<Content: View>: View {
         },
         onScrollDelta: { deltaX, deltaY in
             print("Scroll: \(deltaX), \(deltaY)")
+        },
+        onDoubleTap: {
+            print("Double-Tap: Reset Zoom")
         }
     ) {
         Rectangle()
