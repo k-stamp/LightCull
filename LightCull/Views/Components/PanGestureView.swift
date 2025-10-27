@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+
+#if os(macOS)
 import AppKit
 
 /// NSViewRepresentable that captures two-finger scroll gestures from trackpad
@@ -73,3 +75,4 @@ struct PanGestureView: NSViewRepresentable {
         }
     }
 }
+#endif

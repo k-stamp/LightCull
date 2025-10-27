@@ -39,7 +39,11 @@ struct RenameSheetView: View {
         }
         .padding(24)
         .frame(width: 500)
+        #if os(macOS)
         .background(Color(.windowBackgroundColor))
+        #elseif os(iOS)
+        .background(Color(.systemGroupedBackground))
+        #endif
     }
 
     // MARK: - Header
@@ -101,7 +105,11 @@ struct RenameSheetView: View {
             }
             .frame(maxHeight: 150)
             .padding(12)
+            #if os(macOS)
             .background(Color(.controlBackgroundColor))
+            #elseif os(iOS)
+            .background(Color(.secondarySystemGroupedBackground))
+            #endif
             .clipShape(RoundedRectangle(cornerRadius: 8))
         }
     }

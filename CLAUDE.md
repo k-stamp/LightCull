@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-LightCull is a macOS SwiftUI application for viewing and managing photo pairs (JPEG + RAW files). It provides zoom, pan, and thumbnail navigation functionality for photographers to cull their image libraries.
+LightCull is a cross-platform SwiftUI application (macOS and iPad/iOS) for viewing and managing photo pairs (JPEG + RAW files). It provides zoom, pan, split-view comparison, and thumbnail navigation functionality for photographers to cull their image libraries.
 
 ## Building and Testing
 
@@ -45,10 +45,12 @@ The app uses a **shared ViewModel pattern** for cross-component state synchroniz
 
 2. **View Components** (all in Views/Components/)
    - `ImageViewerView`: Main image display with zoom (1.0-4.0x) and pan gestures
-   - `ZoomAndPanGestureView`: Handles trackpad magnification and scroll events
+   - `SplitViewContainer`: Side-by-side image comparison with synchronized zoom/pan
+   - `CrossPlatformGestureView`: Platform-specific gesture handling (macOS: NSEvent, iOS: native SwiftUI)
+   - `ZoomAndPanGestureView`: Handles trackpad magnification and scroll events (macOS-specific)
    - `PanGestureView`: Standalone pan gesture component (legacy/alternative)
-   - `ThumbnailBarView`: Horizontal scrolling thumbnail strip with selection and multi-select
-   - `SidebarView`: Folder selection via NSOpenPanel, displays statistics and metadata
+   - `ThumbnailBarView`: Horizontal scrolling thumbnail strip with selection, multi-select, and image counter
+   - `SidebarView`: Folder selection, statistics, metadata, and "Open in Finder" button
    - `RenameSheetView`: Modal for batch renaming selected images
    - `ThumbnailProgressView`: Progress sheet shown during thumbnail generation
 
@@ -139,6 +141,33 @@ The app uses a **shared ViewModel pattern** for cross-component state synchroniz
 - Both JPEG and RAW files renamed together
 - Folder rescanned after rename to refresh state
 
+**Split View Mode:**
+- Compare two images side-by-side with synchronized zoom and pan
+- Left image is the "reference" (fixed, no interactions)
+- Right image is the "comparison" (can navigate, tag, delete, archive)
+- Activated via toolbar button or ⌘S keyboard shortcut
+- Current selected image becomes the reference when split view is activated
+- Zoom and pan controls affect both images simultaneously via shared `ImageViewModel`
+- Only the right (comparison) image responds to keyboard shortcuts for tagging and file operations
+
+**Cross-Platform Gesture Handling:**
+- `CrossPlatformGestureView` abstracts platform differences
+- macOS: Uses NSEvent-based handling for trackpad magnification and scrolling
+- iOS/iPadOS: Uses native SwiftUI gesture recognizers
+- Conditional compilation with `#if os(macOS)` and `#if os(iOS)` throughout codebase
+- Ensures consistent zoom/pan behavior across platforms
+
+**Shortcuts Overlay:**
+- Info button (ⓘ) in toolbar toggles keyboard shortcuts help overlay
+- Semi-transparent panel displays all available keyboard shortcuts
+- Automatically dismisses when user interacts with images
+- Helps new users discover keyboard-based workflow
+
+**Open in Finder Integration:**
+- "Open in Finder" button in sidebar (macOS only)
+- Uses `NSWorkspace.shared.selectFile()` to reveal current folder in Finder
+- Useful for quick access to files outside the app
+
 ### Immutable Data Model Pattern
 
 `ImagePair` is an immutable struct - when tag status or thumbnails change, a new instance is created:
@@ -185,11 +214,13 @@ The codebase contains German comments throughout. This is intentional and should
 
 - Folder selection and JPEG/RAW pairing (Fujifilm .RAF format)
 - Image viewer with AsyncImage loading
+- Split view mode: Side-by-side image comparison with synchronized zoom/pan
 - Zoom: 100-400% with multiple input methods (toolbar, slider, keyboard, trackpad)
 - Pan: Constrained dragging and scrolling when zoomed
-- Thumbnail bar with selection state and multi-select for batch operations
+- Thumbnail bar with selection state, multi-select for batch operations, and image counter
 - Thumbnail caching for performance
 - Resizable thumbnail bar (120-400px height)
+- Cross-platform support: macOS and iPad/iOS with platform-specific gestures
 - Keyboard shortcuts:
   - ⌘+/⌘- (zoom), ⌘0 (reset)
   - T (toggle TOP tag)
@@ -200,11 +231,14 @@ The codebase contains German comments throughout. This is intentional and should
   - ← → (navigate)
   - ⌘N (rename selected)
   - ⌘⌥T (toggle thumbnail bar)
+  - ⌘S (toggle split view)
 - Finder tag management: Mark images as "TOP" for culling
 - File organization: Move unwanted/archived images to destination folders with undo
 - Batch rename: Rename selected images with custom prefix
 - EXIF metadata display: Camera info, focal length, aperture, shutter speed, ISO
 - Folder statistics: Total files, pairs, deletions, tagged images
+- "Open in Finder" button for quick access to current folder (macOS)
+- Keyboard shortcuts overlay (info button) for discoverability
 - Security-scoped resource access for sandboxed operation
 
 ## Test Resources

@@ -6,6 +6,8 @@
 //
 
 import SwiftUI
+
+#if os(macOS)
 import AppKit
 
 /// NSViewRepresentable that captures both zoom (magnify) and pan (scroll) gestures
@@ -96,3 +98,4 @@ struct ZoomAndPanGestureView: NSViewRepresentable {
         }
     }
 }
+#endif

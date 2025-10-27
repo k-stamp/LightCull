@@ -6,6 +6,13 @@
 //
 
 import SwiftUI
+import UniformTypeIdentifiers
+
+#if os(macOS)
+import AppKit
+#elseif os(iOS)
+import UIKit
+#endif
 
 struct SidebarView: View {
     @Binding var folderURL: URL?
@@ -18,8 +25,13 @@ struct SidebarView: View {
     let statistics: FolderStatistics?
 
     let onFolderSelected: (URL) -> Void
-    
+
     private let fileService = FileService()
+
+    // iOS: State for document picker
+    #if os(iOS)
+    @State private var showDocumentPicker = false
+    #endif
     
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -42,9 +54,23 @@ struct SidebarView: View {
 
             Spacer()
         }
+        #if os(macOS)
         .frame(minWidth: 200, idealWidth: 250, maxWidth: 300)
         .navigationSplitViewColumnWidth(min: 200, ideal: 250, max: 300)
+        #elseif os(iOS)
+        .frame(minWidth: 280, idealWidth: 320, maxWidth: 400)
+        .navigationSplitViewColumnWidth(min: 280, ideal: 320, max: 400)
+        #endif
         .background(Color.black)
+        #if os(iOS)
+        .sheet(isPresented: $showDocumentPicker) {
+            DocumentPicker(onFolderSelected: { url in
+                folderURL = url
+                onFolderSelected(url)
+                showDocumentPicker = false
+            })
+        }
+        #endif
     }
     
     // MARK: - Folder Selection Section
@@ -61,27 +87,6 @@ struct SidebarView: View {
             .buttonStyle(.borderedProminent)
             .tint(.blue)
             .padding(.horizontal)
-            
-            if let folderURL {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Selected Folder:")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text(folderURL.path)
-                        .font(.body)
-                        .lineLimit(2)
-                        .textSelection(.enabled)  // Ermöglicht Kopieren des Pfads
-                }
-                .padding(.horizontal)
-
-                Button {
-                    openInFinder(folderURL)
-                } label: {
-                    Label("Open in Finder", systemImage: "folder")
-                }
-                .buttonStyle(.bordered)
-                .padding(.horizontal)
-            }
         }
     }
     
@@ -214,6 +219,7 @@ struct SidebarView: View {
 
     // MARK: - Helper Methods
 
+    #if os(macOS)
     /// Opens the macOS dialog for folder selection
     private func selectFolder() {
         let panel = NSOpenPanel()
@@ -224,17 +230,55 @@ struct SidebarView: View {
         if panel.runModal() == .OK, let url = panel.url {
             folderURL = url
 
-            // NEW: MainView will now handle BOTH security access AND loading pairs
+            // MainView will now handle BOTH security access AND loading pairs
             // This prevents blocking the main thread
             onFolderSelected(url)
         }
     }
+    #elseif os(iOS)
+    /// Opens the iOS document picker for folder selection
+    private func selectFolder() {
+        showDocumentPicker = true
+    }
+    #endif
+}
 
-    /// Öffnet ein Finder-Fenster mit dem angegebenen Ordner
-    private func openInFinder(_ url: URL) {
-        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
+// MARK: - iOS Document Picker
+
+#if os(iOS)
+/// UIViewControllerRepresentable for iOS folder selection
+struct DocumentPicker: UIViewControllerRepresentable {
+    let onFolderSelected: (URL) -> Void
+
+    func makeUIViewController(context: Context) -> UIDocumentPickerViewController {
+        let picker = UIDocumentPickerViewController(forOpeningContentTypes: [.folder])
+        picker.allowsMultipleSelection = false
+        picker.delegate = context.coordinator
+        return picker
+    }
+
+    func updateUIViewController(_ uiViewController: UIDocumentPickerViewController, context: Context) {
+        // No updates needed
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onFolderSelected: onFolderSelected)
+    }
+
+    class Coordinator: NSObject, UIDocumentPickerDelegate {
+        let onFolderSelected: (URL) -> Void
+
+        init(onFolderSelected: @escaping (URL) -> Void) {
+            self.onFolderSelected = onFolderSelected
+        }
+
+        func documentPicker(_ controller: UIDocumentPickerViewController, didPickDocumentsAt urls: [URL]) {
+            guard let url = urls.first else { return }
+            onFolderSelected(url)
+        }
     }
 }
+#endif
 
 // MARK: - Previews
 

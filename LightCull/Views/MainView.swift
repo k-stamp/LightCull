@@ -124,7 +124,11 @@ struct MainView: View {
                     }
                 }
                 .animation(.easeInOut(duration: 0.25), value: showThumbnailBar)
+                #if os(macOS)
                 .background(Color(.controlBackgroundColor))
+                #elseif os(iOS)
+                .background(Color(.systemBackground))
+                #endif
 
                 // NEW: Shortcuts overlay
                 if showShortcutsOverlay {
@@ -246,10 +250,17 @@ struct MainView: View {
             showThumbnailBar.toggle()
         }) {
             Image(systemName: "sidebar.right")
+                #if os(macOS)
                 .imageScale(.large)
+                #elseif os(iOS)
+                .imageScale(.large)
+                .font(.title2)
+                #endif
                 .foregroundStyle(showThumbnailBar ? .primary : .secondary)
         }
+        #if os(macOS)
         .help("Toggle thumbnail bar (⌘⌥T)")
+        #endif
     }
 
     // MARK: - Split View Toggle (NEW!)
@@ -260,11 +271,18 @@ struct MainView: View {
             toggleSplitView()
         }) {
             Image(systemName: "rectangle.split.2x1")
+                #if os(macOS)
                 .imageScale(.large)
+                #elseif os(iOS)
+                .imageScale(.large)
+                .font(.title2)
+                #endif
                 .foregroundStyle(isSplitViewActive ? .blue : .primary)
         }
         .disabled(selectedPair == nil && !isSplitViewActive)
+        #if os(macOS)
         .help("Split View (⌘ S)")
+        #endif
     }
 
     // MARK: - Info Button & Shortcuts Overlay (NEW!)
@@ -275,10 +293,17 @@ struct MainView: View {
             showShortcutsOverlay.toggle()
         }) {
             Image(systemName: "info.circle")
+                #if os(macOS)
                 .imageScale(.large)
+                #elseif os(iOS)
+                .imageScale(.large)
+                .font(.title2)
+                #endif
                 .foregroundStyle(showShortcutsOverlay ? .blue : .primary)
         }
+        #if os(macOS)
         .help("Show keyboard shortcuts")
+        #endif
     }
 
     /// Shortcuts overlay view
@@ -354,7 +379,11 @@ struct MainView: View {
             }
             .padding(24)
             .frame(width: 450, height: 550)
+            #if os(macOS)
             .background(Color(.windowBackgroundColor))
+            #elseif os(iOS)
+            .background(Color(.systemBackground))
+            #endif
             .clipShape(RoundedRectangle(cornerRadius: 12))
             .shadow(radius: 20)
         }
@@ -379,7 +408,11 @@ struct MainView: View {
                             .frame(minWidth: 80, alignment: .leading)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
+                            #if os(macOS)
                             .background(Color(.controlBackgroundColor))
+                            #elseif os(iOS)
+                            .background(Color(.secondarySystemBackground))
+                            #endif
                             .clipShape(RoundedRectangle(cornerRadius: 4))
 
                         Text(description)
@@ -401,11 +434,18 @@ struct MainView: View {
             handleToggleTag()
         }) {
             Image(systemName: selectedPair?.hasTopTag == true ? "star.fill" : "star")
+                #if os(macOS)
                 .imageScale(.large)
+                #elseif os(iOS)
+                .imageScale(.large)
+                .font(.title2)
+                #endif
                 .foregroundStyle(selectedPair?.hasTopTag == true ? .yellow : .primary)
         }
         .disabled(selectedPair == nil)
+        #if os(macOS)
         .help("Mark/remove as TOP (T)")
+        #endif
     }
     
     // MARK: - Zoom Controls
@@ -418,10 +458,17 @@ struct MainView: View {
                 imageViewModel.zoomOut()
             }) {
                 Image(systemName: "minus.magnifyingglass")
+                    #if os(macOS)
                     .imageScale(.large)
+                    #elseif os(iOS)
+                    .imageScale(.large)
+                    .font(.title2)
+                    #endif
             }
             .disabled(imageViewModel.isMinZoom)
+            #if os(macOS)
             .help("Zoom out (⌘-)")
+            #endif
 
             // Zoom slider with percentage display
             HStack(spacing: 8) {
@@ -446,20 +493,34 @@ struct MainView: View {
                 imageViewModel.zoomIn()
             }) {
                 Image(systemName: "plus.magnifyingglass")
+                    #if os(macOS)
                     .imageScale(.large)
+                    #elseif os(iOS)
+                    .imageScale(.large)
+                    .font(.title2)
+                    #endif
             }
             .disabled(imageViewModel.isMaxZoom)
+            #if os(macOS)
             .help("Zoom in (⌘+)")
+            #endif
 
             // Reset Zoom Button
             Button(action: {
                 imageViewModel.resetZoom()
             }) {
                 Image(systemName: "arrow.counterclockwise")
+                    #if os(macOS)
                     .imageScale(.large)
+                    #elseif os(iOS)
+                    .imageScale(.large)
+                    .font(.title2)
+                    #endif
             }
             .disabled(imageViewModel.isMinZoom)
+            #if os(macOS)
             .help("Reset zoom (⌘0)")
+            #endif
         }
         .disabled(selectedPair == nil)
     }
