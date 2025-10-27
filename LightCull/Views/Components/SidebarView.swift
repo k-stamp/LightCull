@@ -87,35 +87,6 @@ struct SidebarView: View {
             .buttonStyle(.borderedProminent)
             .tint(.blue)
             .padding(.horizontal)
-            
-            if let folderURL {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Selected Folder:")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                    Text(folderURL.path)
-                        .font(.body)
-                        .lineLimit(2)
-                        .textSelection(.enabled)  // Ermöglicht Kopieren des Pfads
-                }
-                .padding(.horizontal)
-
-                #if os(macOS)
-                Button {
-                    openInFinder(folderURL)
-                } label: {
-                    Label("Open in Finder", systemImage: "folder")
-                }
-                .buttonStyle(.bordered)
-                .padding(.horizontal)
-                #elseif os(iOS)
-                ShareLink(item: folderURL) {
-                    Label("Share Folder", systemImage: "square.and.arrow.up")
-                }
-                .buttonStyle(.bordered)
-                .padding(.horizontal)
-                #endif
-            }
         }
     }
     
@@ -263,11 +234,6 @@ struct SidebarView: View {
             // This prevents blocking the main thread
             onFolderSelected(url)
         }
-    }
-
-    /// Öffnet ein Finder-Fenster mit dem angegebenen Ordner
-    private func openInFinder(_ url: URL) {
-        NSWorkspace.shared.selectFile(nil, inFileViewerRootedAtPath: url.path)
     }
     #elseif os(iOS)
     /// Opens the iOS document picker for folder selection
