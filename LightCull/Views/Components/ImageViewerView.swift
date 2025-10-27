@@ -166,9 +166,18 @@ struct ImageViewerView: View {
                         viewSize: availableSize
                     )
                 },
+                currentZoomScale: viewModel.zoomScale,
                 onDoubleTap: {
                     // Bei Doppeltipp: Zoom zurücksetzen (nur iOS)
                     viewModel.resetZoom()
+                },
+                onSwipeLeft: {
+                    // Swipe nach links → nächstes Bild (nur bei 100% Zoom auf iOS)
+                    onNextImage()
+                },
+                onSwipeRight: {
+                    // Swipe nach rechts → vorheriges Bild (nur bei 100% Zoom auf iOS)
+                    onPreviousImage()
                 }
             ) {
                 // Transparent overlay to capture gestures

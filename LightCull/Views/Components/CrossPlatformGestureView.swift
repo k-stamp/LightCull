@@ -13,23 +13,32 @@ import AppKit
 
 /// Cross-platform gesture view that works on both macOS and iOS
 /// - macOS: Uses NSEvent for trackpad gestures
-/// - iOS: Uses native SwiftUI gestures
+/// - iOS: Uses native SwiftUI gestures (including swipe navigation)
 struct CrossPlatformGestureView<Content: View>: View {
     let content: Content
     let onMagnify: (CGFloat) -> Void
     let onScrollDelta: (CGFloat, CGFloat) -> Void
     let onDoubleTap: (() -> Void)?
+    let onSwipeLeft: (() -> Void)?   // NEW: Navigation to next image
+    let onSwipeRight: (() -> Void)?  // NEW: Navigation to previous image
+    let currentZoomScale: CGFloat     // NEW: Current zoom level for swipe detection
 
     init(
         onMagnify: @escaping (CGFloat) -> Void,
         onScrollDelta: @escaping (CGFloat, CGFloat) -> Void,
+        currentZoomScale: CGFloat = 1.0,
         onDoubleTap: (() -> Void)? = nil,
+        onSwipeLeft: (() -> Void)? = nil,
+        onSwipeRight: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.content = content()
         self.onMagnify = onMagnify
         self.onScrollDelta = onScrollDelta
+        self.currentZoomScale = currentZoomScale
         self.onDoubleTap = onDoubleTap
+        self.onSwipeLeft = onSwipeLeft
+        self.onSwipeRight = onSwipeRight
     }
 
     var body: some View {
@@ -46,12 +55,15 @@ struct CrossPlatformGestureView<Content: View>: View {
             .allowsHitTesting(true)
         }
         #elseif os(iOS)
-        // iOS: Use native SwiftUI gestures
+        // iOS: Use native SwiftUI gestures (including swipe navigation)
         IOSGestureView(
             content: content,
             onMagnify: onMagnify,
             onScrollDelta: onScrollDelta,
-            onDoubleTap: onDoubleTap
+            currentZoomScale: currentZoomScale,
+            onDoubleTap: onDoubleTap,
+            onSwipeLeft: onSwipeLeft,
+            onSwipeRight: onSwipeRight
         )
         #endif
     }
@@ -65,10 +77,17 @@ struct IOSGestureView<Content: View>: View {
     let content: Content
     let onMagnify: (CGFloat) -> Void
     let onScrollDelta: (CGFloat, CGFloat) -> Void
+    let currentZoomScale: CGFloat
     let onDoubleTap: (() -> Void)?
+    let onSwipeLeft: (() -> Void)?
+    let onSwipeRight: (() -> Void)?
 
     @State private var lastMagnification: CGFloat = 1.0
     @State private var lastDragTranslation: CGSize = .zero
+
+    // Swipe detection thresholds
+    private let minSwipeDistance: CGFloat = 50.0  // Minimum horizontal distance for swipe
+    private let maxVerticalDeviation: CGFloat = 30.0  // Maximum vertical movement allowed
 
     var body: some View {
         content
@@ -110,28 +129,67 @@ struct IOSGestureView<Content: View>: View {
                     }
                     // WICHTIG: simultaneously erlaubt beide Gesten parallel
                     .simultaneously(with:
-                        // Drag gesture for panning (works when zoomed)
+                        // Drag gesture: Panning when zoomed OR Swipe navigation at 100% zoom
                         DragGesture(minimumDistance: 0)
                             .onChanged { value in
-                                // Calculate delta from last translation
-                                let deltaX = value.translation.width - lastDragTranslation.width
-                                let deltaY = value.translation.height - lastDragTranslation.height
+                                // Check if we should handle panning or swipe
+                                if currentZoomScale > 1.0 {
+                                    // PANNING MODE: When zoomed in
+                                    let deltaX = value.translation.width - lastDragTranslation.width
+                                    let deltaY = value.translation.height - lastDragTranslation.height
 
-                                #if DEBUG
-                                // Nur loggen wenn wir tatsächlich bewegen
-                                if abs(deltaX) > 1 || abs(deltaY) > 1 {
-                                    print("🔍 iOS Drag - deltaX: \(deltaX), deltaY: \(deltaY)")
+                                    #if DEBUG
+                                    // Nur loggen wenn wir tatsächlich bewegen
+                                    if abs(deltaX) > 1 || abs(deltaY) > 1 {
+                                        print("🔍 iOS Drag (Pan) - deltaX: \(deltaX), deltaY: \(deltaY)")
+                                    }
+                                    #endif
+
+                                    onScrollDelta(deltaX, deltaY)
+                                    lastDragTranslation = value.translation
+                                } else {
+                                    // SWIPE MODE: At 100% zoom, track translation for swipe detection
+                                    // (actual swipe detection happens in onEnded)
+                                    lastDragTranslation = value.translation
                                 }
-                                #endif
-
-                                onScrollDelta(deltaX, deltaY)
-                                lastDragTranslation = value.translation
                             }
-                            .onEnded { _ in
+                            .onEnded { value in
+                                // Check if we should handle swipe navigation
+                                if currentZoomScale == 1.0 {
+                                    // SWIPE DETECTION: Only at 100% zoom
+                                    let horizontalDistance = value.translation.width
+                                    let verticalDistance = abs(value.translation.height)
+
+                                    #if DEBUG
+                                    print("🔍 iOS Drag ended - horizontal: \(horizontalDistance), vertical: \(verticalDistance), zoom: \(currentZoomScale)")
+                                    #endif
+
+                                    // Check if this was a valid swipe:
+                                    // 1. Enough horizontal movement
+                                    // 2. Not too much vertical movement
+                                    if abs(horizontalDistance) >= minSwipeDistance && verticalDistance <= maxVerticalDeviation {
+                                        if horizontalDistance > 0 {
+                                            // Swipe RIGHT → Previous image
+                                            #if DEBUG
+                                            print("🔍 iOS Swipe RIGHT detected")
+                                            #endif
+                                            onSwipeRight?()
+                                        } else {
+                                            // Swipe LEFT → Next image
+                                            #if DEBUG
+                                            print("🔍 iOS Swipe LEFT detected")
+                                            #endif
+                                            onSwipeLeft?()
+                                        }
+                                    }
+                                } else {
+                                    // PANNING ended
+                                    #if DEBUG
+                                    print("🔍 iOS Drag (Pan) ended")
+                                    #endif
+                                }
+
                                 // Reset for next gesture
-                                #if DEBUG
-                                print("🔍 iOS Drag ended")
-                                #endif
                                 lastDragTranslation = .zero
                             }
                     )
@@ -148,8 +206,15 @@ struct IOSGestureView<Content: View>: View {
         onScrollDelta: { deltaX, deltaY in
             print("Scroll: \(deltaX), \(deltaY)")
         },
+        currentZoomScale: 1.0,
         onDoubleTap: {
             print("Double-Tap: Reset Zoom")
+        },
+        onSwipeLeft: {
+            print("Swipe LEFT: Next Image")
+        },
+        onSwipeRight: {
+            print("Swipe RIGHT: Previous Image")
         }
     ) {
         Rectangle()
