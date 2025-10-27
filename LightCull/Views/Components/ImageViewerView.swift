@@ -187,7 +187,16 @@ struct ImageViewerView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             // Allow the view to receive mouse/trackpad/touch events
             .allowsHitTesting(true)
+
+            #if os(iOS)
+            // NEW: Navigation buttons (only visible when zoomed on iOS/iPad)
+            if viewModel.zoomScale > viewModel.minZoom {
+                navigationButtonsOverlay()
+                    .transition(.opacity)
+            }
+            #endif
         }
+        .animation(.easeInOut(duration: 0.3), value: viewModel.zoomScale > viewModel.minZoom)
     }
     
     // MARK: - State Views
@@ -252,6 +261,44 @@ struct ImageViewerView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
     }
+
+    // MARK: - Navigation Buttons (iOS only)
+
+    #if os(iOS)
+    /// Navigation buttons overlay for zoomed images (iOS/iPad only)
+    /// Shows circular Previous/Next buttons on the left and right edges
+    @ViewBuilder
+    private func navigationButtonsOverlay() -> some View {
+        HStack(spacing: 0) {
+            // LEFT BUTTON: Previous Image
+            Button(action: {
+                onPreviousImage()
+            }) {
+                Image(systemName: "chevron.left.circle.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            }
+            .padding(.leading, 20)
+            .frame(maxHeight: .infinity, alignment: .center)
+
+            Spacer()
+
+            // RIGHT BUTTON: Next Image
+            Button(action: {
+                onNextImage()
+            }) {
+                Image(systemName: "chevron.right.circle.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            }
+            .padding(.trailing, 20)
+            .frame(maxHeight: .infinity, alignment: .center)
+        }
+        .allowsHitTesting(true)
+    }
+    #endif
 }
 
 // MARK: - Previews
