@@ -67,36 +67,62 @@ struct IOSGestureView<Content: View>: View {
 
     var body: some View {
         content
+            // WICHTIG: contentShape macht den gesamten Bereich touch-sensitiv
+            .contentShape(Rectangle())
             .gesture(
                 // Magnification gesture for pinch-to-zoom
-                MagnificationGesture()
+                // WICHTIG: Wir verwenden .simultaneously statt .gesture, damit
+                // sowohl Zoom als auch Pan gleichzeitig funktionieren
+                MagnificationGesture(minimumScaleDelta: 0.0)
                     .onChanged { value in
                         // Calculate the delta from last magnification
-                        // This mimics the macOS NSEvent.magnification behavior
+                        // iOS MagnificationGesture gibt kumulative Werte (1.0, 1.1, 1.2, ...)
+                        // handleMagnification() erwartet einen Multiplikator
+                        // Also: value=1.1, last=1.0 → delta=1.1/1.0 = 1.1 (10% Zoom)
                         let delta = value / lastMagnification
+
+                        // Debug: Log zum Testen
+                        #if DEBUG
+                        print("🔍 iOS Magnify - value: \(value), last: \(lastMagnification), delta: \(delta)")
+                        #endif
+
                         onMagnify(delta)
                         lastMagnification = value
                     }
                     .onEnded { _ in
                         // Reset for next gesture
+                        #if DEBUG
+                        print("🔍 iOS Magnify ended")
+                        #endif
                         lastMagnification = 1.0
                     }
-            )
-            .simultaneousGesture(
-                // Drag gesture for panning (works when zoomed)
-                DragGesture()
-                    .onChanged { value in
-                        // Calculate delta from last translation
-                        let deltaX = value.translation.width - lastDragTranslation.width
-                        let deltaY = value.translation.height - lastDragTranslation.height
+                    // WICHTIG: simultaneously erlaubt beide Gesten parallel
+                    .simultaneously(with:
+                        // Drag gesture for panning (works when zoomed)
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                // Calculate delta from last translation
+                                let deltaX = value.translation.width - lastDragTranslation.width
+                                let deltaY = value.translation.height - lastDragTranslation.height
 
-                        onScrollDelta(deltaX, deltaY)
-                        lastDragTranslation = value.translation
-                    }
-                    .onEnded { _ in
-                        // Reset for next gesture
-                        lastDragTranslation = .zero
-                    }
+                                #if DEBUG
+                                // Nur loggen wenn wir tatsächlich bewegen
+                                if abs(deltaX) > 1 || abs(deltaY) > 1 {
+                                    print("🔍 iOS Drag - deltaX: \(deltaX), deltaY: \(deltaY)")
+                                }
+                                #endif
+
+                                onScrollDelta(deltaX, deltaY)
+                                lastDragTranslation = value.translation
+                            }
+                            .onEnded { _ in
+                                // Reset for next gesture
+                                #if DEBUG
+                                print("🔍 iOS Drag ended")
+                                #endif
+                                lastDragTranslation = .zero
+                            }
+                    )
             )
     }
 }
