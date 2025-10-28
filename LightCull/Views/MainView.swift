@@ -803,9 +803,12 @@ struct MainView: View {
             return
         }
 
+        // 3. Remember the currently selected image (to keep selection after undo)
+        let currentlySelectedPair = selectedPair
+
         Logger.ui.debug("Undoing last move")
 
-        // 3. Call ViewModel to execute the undo
+        // 4. Call ViewModel to execute the undo
         imageViewModel.undoLastMove { success in
             // Callback is called when undo is finished
 
@@ -813,11 +816,23 @@ struct MainView: View {
                 // Undo was successful!
                 Logger.ui.info("Undo successful")
 
-                // 4. Rescan folder (WITHOUT regenerating thumbnails) to show restored image
+                // 5. Rescan folder (WITHOUT regenerating thumbnails) to show restored image
                 rescanFolderWithoutThumbnails(folder) {
-                    // 5. Select the restored image (it's now the last in the list)
-                    if pairs.isEmpty == false {
-                        selectedPair = pairs.last
+                    // 6. Restore the previously selected image (stay on current image)
+                    if let previouslySelected = currentlySelectedPair {
+                        // Try to find the previously selected image in the updated pairs array
+                        if let matchingPair = pairs.first(where: { $0 == previouslySelected }) {
+                            // Found it - select it again
+                            selectedPair = matchingPair
+                            Logger.ui.debug("Restored selection to: \(matchingPair.jpegURL.lastPathComponent)")
+                        } else {
+                            // Previously selected image no longer exists - select first image
+                            selectedPair = pairs.first
+                            Logger.ui.debug("Previously selected image not found - selecting first image")
+                        }
+                    } else {
+                        // No previous selection - select first image
+                        selectedPair = pairs.first
                     }
                 }
             } else {
