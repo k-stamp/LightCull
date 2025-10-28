@@ -26,6 +26,9 @@ struct ThumbnailBarView: View {
     // NEW: Callback for context menu "Rename"
     let onRenameSelected: () -> Void
 
+    // NEW: Callback for deleting JPEG-only files
+    let onDeleteJPEGOnly: (ImagePair) -> Void
+
     // NEW: State for last click (for shift-selection)
     @State private var lastClickedPairID: UUID? = nil
 
@@ -291,6 +294,14 @@ struct ThumbnailBarView: View {
             Button("Umbenennen...") {
                 handleRenameFromContextMenu(for: pair)
             }
+
+            // NEW: Delete option (only for JPEGs without RAW)
+            if pair.rawURL == nil {
+                Divider()
+                Button("Löschen", role: .destructive) {
+                    handleDeleteJPEGOnly(for: pair)
+                }
+            }
         }
     }
 
@@ -413,6 +424,12 @@ struct ThumbnailBarView: View {
         // Call callback
         onRenameSelected()
     }
+
+    /// Called when "Löschen" is clicked in the context menu (only for JPEG-only pairs)
+    private func handleDeleteJPEGOnly(for pair: ImagePair) {
+        // Call callback to MainView
+        onDeleteJPEGOnly(pair)
+    }
 }
 
 #Preview("ThumbnailBarView - Empty") {
@@ -423,7 +440,8 @@ struct ThumbnailBarView: View {
         selectedLeftPair: .constant(nil),
         selectedRightPair: .constant(nil),
         isSplitViewActive: false,
-        onRenameSelected: { }
+        onRenameSelected: { },
+        onDeleteJPEGOnly: { _ in }
     )
 }
 
@@ -451,6 +469,7 @@ struct ThumbnailBarView: View {
         selectedLeftPair: .constant(nil),
         selectedRightPair: .constant(nil),
         isSplitViewActive: false,
-        onRenameSelected: { }
+        onRenameSelected: { },
+        onDeleteJPEGOnly: { _ in }
     )
 }

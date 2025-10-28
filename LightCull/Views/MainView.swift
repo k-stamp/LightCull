@@ -58,6 +58,17 @@ struct MainView: View {
     // NEW: State for shortcuts overlay
     @State private var showShortcutsOverlay = false
 
+    // NEW: State for tracking deleted JPEG-only files (for undo)
+    @State private var lastDeletedJPEGURL: URL? = nil
+    @State private var lastDeletedThumbnailURL: URL? = nil
+
+    // NEW: State for external app integration (macOS only)
+    #if os(macOS)
+    @State private var externalAppService = ExternalAppService()
+    @State private var showExternalAppError = false
+    @State private var externalAppErrorMessage = ""
+    #endif
+
     // Initialization for tests and previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
         _pairs = State(initialValue: pairs)
@@ -118,7 +129,8 @@ struct MainView: View {
                             selectedLeftPair: $leftImagePair,
                             selectedRightPair: $rightImagePair,
                             isSplitViewActive: isSplitViewActive,
-                            onRenameSelected: handleRenameButtonClicked
+                            onRenameSelected: handleRenameButtonClicked,
+                            onDeleteJPEGOnly: handleDeleteJPEGOnly
                         )
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
@@ -184,6 +196,14 @@ struct MainView: View {
                         Divider()
                             .frame(height: 20)
 
+                        // NEW: Open with external app button (macOS only)
+                        #if os(macOS)
+                        openWithButtonView
+
+                        Divider()
+                            .frame(height: 20)
+                        #endif
+
                         // NEW: Info button for shortcuts
                         infoButton
                     }
@@ -202,6 +222,9 @@ struct MainView: View {
         .onChange(of: folderURL) { oldValue, newValue in
             // Clear the move history when folder changes
             imageViewModel.clearMoveHistory()
+            // Clear delete history
+            lastDeletedJPEGURL = nil
+            lastDeletedThumbnailURL = nil
         }
         // NEW: Show rename sheet
         .sheet(isPresented: $showRenameSheet) {
@@ -211,6 +234,14 @@ struct MainView: View {
         .sheet(isPresented: $isGeneratingThumbnails) {
             thumbnailProgressSheetView
         }
+        // NEW: Error alert for external app operations (macOS only)
+        #if os(macOS)
+        .alert("Fehler", isPresented: $showExternalAppError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(externalAppErrorMessage)
+        }
+        #endif
     }
     
     // MARK: - Thumbnail Progress Sheet (NEW!)
@@ -305,6 +336,37 @@ struct MainView: View {
         .help("Show keyboard shortcuts")
         #endif
     }
+
+    // MARK: - Open With Button (macOS only)
+
+    #if os(macOS)
+    /// Open with external app button for the toolbar
+    private var openWithButtonView: some View {
+        Menu {
+            // Luminar Neo option
+            Button(action: {
+                handleOpenWithLuminarNeo()
+            }) {
+                Label("Luminar Neo (JPEG bearbeiten)", systemImage: "photo")
+            }
+            .disabled(!externalAppService.isLuminarNeoInstalled())
+
+            // Fuji X Raw Studio option
+            Button(action: {
+                handleOpenWithFujiXRawStudio()
+            }) {
+                Label("Fuji X Raw Studio (RAW bearbeiten)", systemImage: "camera")
+            }
+            .disabled(!externalAppService.isFujiXRawStudioInstalled() || selectedPair?.rawURL == nil)
+
+        } label: {
+            Image(systemName: "arrow.up.forward.app")
+                .imageScale(.large)
+        }
+        .disabled(selectedPair == nil || isSplitViewActive)
+        .help("In externer App öffnen")
+    }
+    #endif
 
     /// Shortcuts overlay view
     private var shortcutsOverlayView: some View {
@@ -648,6 +710,105 @@ struct MainView: View {
         return result
     }
 
+    // MARK: - Delete JPEG-only Handler (NEW!)
+
+    /// Stellt ein gelöschtes JPEG-only File aus dem Papierkorb wieder her
+    private func handleUndoDeleteJPEGOnly(trashedJPEGURL: URL) {
+        guard let folder = folderURL else {
+            Logger.ui.error("Kein Folder ausgewählt - kann Undo nicht ausführen")
+            return
+        }
+
+        // Originalen Dateinamen extrahieren
+        let originalFilename = trashedJPEGURL.lastPathComponent
+        let restoredURL = folder.appendingPathComponent(originalFilename)
+
+        do {
+            // JPEG aus Papierkorb zurück in Original-Folder verschieben
+            try FileManager.default.moveItem(at: trashedJPEGURL, to: restoredURL)
+            Logger.ui.info("JPEG wiederhergestellt aus Papierkorb: \(originalFilename)")
+
+            // Undo-State zurücksetzen
+            lastDeletedJPEGURL = nil
+            lastDeletedThumbnailURL = nil
+
+            // Folder rescannen um wiederhergestelltes JPEG anzuzeigen
+            rescanFolderSilently(folder) {
+                // Wiederhergestelltes JPEG auswählen
+                if let restoredPair = self.pairs.first(where: { $0.jpegURL == restoredURL }) {
+                    self.selectedPair = restoredPair
+                    Logger.ui.info("Wiederhergestelltes JPEG ausgewählt")
+                }
+            }
+
+        } catch {
+            Logger.ui.error("Fehler beim Wiederherstellen: \(error.localizedDescription)")
+            #if os(macOS)
+            DispatchQueue.main.async {
+                self.externalAppErrorMessage = "Fehler beim Wiederherstellen: \(error.localizedDescription)"
+                self.showExternalAppError = true
+            }
+            #endif
+        }
+    }
+
+    /// Called when "Löschen" is clicked in context menu for JPEG-only files
+    private func handleDeleteJPEGOnly(for pair: ImagePair) {
+        // Sicherheitsprüfung: Nur JPEGs ohne RAW dürfen gelöscht werden
+        guard pair.rawURL == nil else {
+            Logger.ui.error("Versuch, Pair mit RAW zu löschen - nicht erlaubt!")
+            return
+        }
+
+        // JPEG-Datei löschen
+        do {
+            var trashedURL: NSURL? = nil
+            try FileManager.default.trashItem(at: pair.jpegURL, resultingItemURL: &trashedURL)
+
+            // Papierkorb-URL für Undo speichern
+            if let trashedURL = trashedURL as URL? {
+                lastDeletedJPEGURL = trashedURL
+                lastDeletedThumbnailURL = pair.thumbnailURL
+                Logger.ui.info("JPEG gelöscht (in Papierkorb): \(pair.jpegURL.lastPathComponent) → \(trashedURL.path)")
+            }
+
+            // Thumbnail auch löschen
+            if let thumbnailURL = pair.thumbnailURL {
+                try? FileManager.default.removeItem(at: thumbnailURL)
+            }
+
+            // Pair aus Array entfernen
+            if let index = pairs.firstIndex(of: pair) {
+                pairs.remove(at: index)
+
+                // Wenn das gelöschte Pair ausgewählt war, Auswahl anpassen
+                if selectedPair?.id == pair.id {
+                    // Nächstes oder vorheriges Pair auswählen
+                    if index < pairs.count {
+                        selectedPair = pairs[index]  // Nächstes
+                    } else if !pairs.isEmpty {
+                        selectedPair = pairs[index - 1]  // Vorheriges
+                    } else {
+                        selectedPair = nil  // Keine Pairs mehr
+                    }
+                }
+            }
+
+            // Statistiken aktualisieren
+            refreshStatistics()
+
+        } catch {
+            // Fehler beim Löschen
+            DispatchQueue.main.async {
+                #if os(macOS)
+                self.externalAppErrorMessage = "Fehler beim Löschen: \(error.localizedDescription)"
+                self.showExternalAppError = true
+                #endif
+            }
+            Logger.ui.error("Fehler beim Löschen: \(error.localizedDescription)")
+        }
+    }
+
     /// Rescans the folder and updates the pairs
     /// - Parameters:
     ///   - folder: The folder to rescan
@@ -667,6 +828,101 @@ struct MainView: View {
             }
         }
     }
+
+    /// Rescans the folder silently (without showing progress sheet)
+    /// Used for quick rescans like after duplicating a single file
+    /// - Parameters:
+    ///   - folder: The folder to rescan
+    ///   - completion: Optional callback after rescan completes (on main thread)
+    private func rescanFolderSilently(_ folder: URL, completion: (() -> Void)? = nil) {
+        // Rescan asynchronously (to prevent blocking main thread)
+        // NO progress sheet shown!
+        Task {
+            await loadPairsAndGenerateThumbnails(for: folder)
+
+            // After rescan, call completion on main thread
+            await MainActor.run {
+                completion?()
+            }
+        }
+    }
+
+    // MARK: - External App Handlers (macOS only)
+
+    #if os(macOS)
+    /// Workflow: JPEG duplizieren → Thumbnail Bar aktualisieren → Duplikat auswählen → Luminar Neo öffnen
+    private func handleOpenWithLuminarNeo() {
+        guard let currentPair = selectedPair,
+              let folder = folderURL else {
+            return
+        }
+
+        // 1. Duplikat erstellen (synchron, damit wir die URL sofort haben)
+        let duplicateURL: URL
+        do {
+            duplicateURL = try externalAppService.duplicateJPEGForLuminarNeo(jpegURL: currentPair.jpegURL)
+            Logger.ui.info("JPEG dupliziert: \(duplicateURL.lastPathComponent)")
+        } catch {
+            // Fehler beim Duplizieren
+            DispatchQueue.main.async {
+                self.externalAppErrorMessage = (error as? ExternalAppError)?.localizedDescription ?? error.localizedDescription
+                self.showExternalAppError = true
+            }
+            return
+        }
+
+        // 2. Folder rescannen (STILL - ohne Modal Sheet, mit Animation in Thumbnail Bar)
+        rescanFolderSilently(folder) {
+            // 3. Nach Rescan: Duplikat in pairs finden und auswählen
+            if let duplicatePair = self.pairs.first(where: { $0.jpegURL == duplicateURL }) {
+                // Animation: Auswahl ändert sich
+                self.selectedPair = duplicatePair
+                Logger.ui.info("Duplikat ausgewählt: \(duplicatePair.jpegURL.lastPathComponent)")
+
+                // 4. Nach kurzer Verzögerung (für Animation): App öffnen
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.externalAppService.openWithLuminarNeo(fileURL: duplicateURL) { result in
+                        DispatchQueue.main.async {
+                            switch result {
+                            case .success:
+                                Logger.ui.info("Luminar Neo geöffnet mit: \(duplicateURL.lastPathComponent)")
+                            case .failure(let error):
+                                self.externalAppErrorMessage = error.localizedDescription
+                                self.showExternalAppError = true
+                                Logger.ui.error("Fehler beim Öffnen: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Duplikat nicht gefunden (sollte nicht passieren)
+                Logger.ui.error("Duplikat nicht in pairs gefunden: \(duplicateURL.lastPathComponent)")
+            }
+        }
+    }
+
+    /// Öffnet das Original-RAW direkt mit Fuji X Raw Studio (ohne Duplizierung)
+    private func handleOpenWithFujiXRawStudio() {
+        guard let currentPair = selectedPair,
+              let rawURL = currentPair.rawURL else {
+            return
+        }
+
+        // Original-RAW direkt öffnen (keine Duplizierung!)
+        externalAppService.openWithFujiXRawStudio(fileURL: rawURL) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    Logger.ui.info("Fuji X Raw Studio geöffnet mit Original: \(rawURL.lastPathComponent)")
+                case .failure(let error):
+                    self.externalAppErrorMessage = error.localizedDescription
+                    self.showExternalAppError = true
+                    Logger.ui.error("Fehler beim Öffnen: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    #endif
 
     // MARK: - Delete Handlers (NEW!)
 
@@ -789,6 +1045,13 @@ struct MainView: View {
 
     /// Called when the "CMD+Z" shortcut is pressed
     private func handleUndo() {
+        // PRIORITÄT 1: JPEG-only Löschung rückgängig machen (neueste Operation)
+        if let trashedJPEGURL = lastDeletedJPEGURL {
+            handleUndoDeleteJPEGOnly(trashedJPEGURL: trashedJPEGURL)
+            return
+        }
+
+        // PRIORITÄT 2: Move-Operation rückgängig machen
         // 1. Is there even anything to undo?
         let canUndo: Bool = imageViewModel.canUndo()
 
