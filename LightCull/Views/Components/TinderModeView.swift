@@ -221,7 +221,7 @@ struct TinderModeView: View {
     private var swipeIndicatorOverlay: some View {
         ZStack {
             // Left swipe (Archive) - Red overlay
-            if dragOffset.width < -30 {
+            if dragOffset.width < -80 {
                 VStack {
                     HStack {
                         Spacer()
@@ -243,7 +243,7 @@ struct TinderModeView: View {
             }
 
             // Right swipe (Keep) - Green overlay
-            if dragOffset.width > 30 {
+            if dragOffset.width > 80 {
                 VStack {
                     HStack {
                         Spacer()
@@ -265,7 +265,7 @@ struct TinderModeView: View {
             }
 
             // Up swipe (TOP tag) - Yellow overlay
-            if dragOffset.height < -30 {
+            if dragOffset.height < -80 {
                 VStack {
                     Spacer()
                     HStack {
