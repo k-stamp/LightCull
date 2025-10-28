@@ -378,5 +378,87 @@ class ThumbnailService {
             return false
         }
     }
+
+
+    // MARK: - Incremental Thumbnail Generation
+
+    /// Generates thumbnails only for pairs that don't have thumbnails yet
+    /// This is used when external file changes are detected and new images are added
+    /// - Parameters:
+    ///   - pairs: All ImagePairs (some may already have thumbnails)
+    ///   - progress: Optional callback for progress updates (current, total) - executed on MainActor
+    /// - Returns: Updated ImagePairs with thumbnailURL property set for all pairs
+    func generateMissingThumbnails(for pairs: [ImagePair], progress: (@MainActor (Int, Int) -> Void)? = nil) async -> [ImagePair] {
+        // 1. Filter pairs that don't have thumbnails yet
+        let pairsNeedingThumbnails: [ImagePair] = pairs.filter { $0.thumbnailURL == nil }
+
+        // 2. If all pairs already have thumbnails, return original array
+        if pairsNeedingThumbnails.isEmpty {
+            Logger.fileOps.info("All pairs already have thumbnails - no generation needed")
+            return pairs
+        }
+
+        // 3. Log how many thumbnails need to be generated
+        Logger.fileOps.info("⏱️ Generating missing thumbnails for \(pairsNeedingThumbnails.count) pairs...")
+
+        // 4. Ensure cache directory exists
+        let cacheReady: Bool = ensureCacheDirectoryExists()
+        if cacheReady == false {
+            Logger.fileOps.error("Cache directory could not be created - returning original pairs")
+            return pairs
+        }
+
+        // 5. Create dictionary to store updated pairs (key = jpegURL, value = updated pair)
+        var updatedPairsDict: [URL: ImagePair] = [:]
+
+        // 6. Use TaskGroup for parallel thumbnail generation
+        await withTaskGroup(of: (URL, ImagePair, URL?).self) { group in
+            // Start tasks for pairs needing thumbnails
+            for pair in pairsNeedingThumbnails {
+                group.addTask {
+                    // Generate thumbnail for this pair (on background thread)
+                    let thumbnailURL: URL? = self.generateThumbnail(for: pair.jpegURL)
+                    return (pair.jpegURL, pair, thumbnailURL)
+                }
+            }
+
+            // Collect results as they complete
+            var completedCount: Int = 0
+            for await (jpegURL, pair, thumbnailURL) in group {
+                completedCount += 1
+
+                // Report progress on main thread if callback provided
+                if let progress = progress {
+                    await MainActor.run {
+                        progress(completedCount, pairsNeedingThumbnails.count)
+                    }
+                }
+
+                // Create updated pair with thumbnail URL
+                let updatedPair = ImagePair(
+                    jpegURL: pair.jpegURL,
+                    rawURL: pair.rawURL,
+                    hasTopTag: pair.hasTopTag,
+                    thumbnailURL: thumbnailURL
+                )
+
+                // Store in dictionary
+                updatedPairsDict[jpegURL] = updatedPair
+            }
+        }
+
+        // 7. Build final array: use updated pair if available, otherwise original
+        let finalPairs: [ImagePair] = pairs.map { pair in
+            if let updatedPair = updatedPairsDict[pair.jpegURL] {
+                return updatedPair
+            } else {
+                return pair
+            }
+        }
+
+        Logger.fileOps.info("✅ Missing thumbnail generation complete: \(pairsNeedingThumbnails.count) new thumbnails")
+
+        return finalPairs
+    }
 }
 

@@ -48,6 +48,9 @@ struct MainView: View {
     // NEW: Service for thumbnail generation
     private let thumbnailService = ThumbnailService()
 
+    // NEW: Service for folder monitoring
+    @State private var folderMonitor = FolderMonitor()
+
     // NEW: State for thumbnail generation progress
     @State private var isGeneratingThumbnails = false
     @State private var thumbnailProgress: (current: Int, total: Int) = (0, 0)
@@ -1169,6 +1172,11 @@ struct MainView: View {
             await MainActor.run {
                 selectedPair = pairs.first
             }
+
+            // NEW: Start folder monitoring for automatic refresh on external changes
+            #if os(macOS)
+            startFolderMonitoring(for: url)
+            #endif
         }
     }
 
@@ -1267,16 +1275,18 @@ struct MainView: View {
             }.value
 
             // 2. Assign cached thumbnail URLs (very fast - no file I/O)
+            // IMPORTANT: Only set thumbnailURL if file actually exists, otherwise AsyncImage shows infinite loading
             let pairsWithThumbnails: [ImagePair] = loadedPairs.map { pair in
                 // Get thumbnail URL from cache (doesn't check if file exists - just builds the path)
                 let thumbnailURL = thumbnailService.getThumbnailURL(for: pair.jpegURL)
+                let thumbnailExists = FileManager.default.fileExists(atPath: thumbnailURL.path)
 
-                // Create updated pair with thumbnail URL
+                // Create updated pair with thumbnail URL (only if it exists)
                 return ImagePair(
                     jpegURL: pair.jpegURL,
                     rawURL: pair.rawURL,
                     hasTopTag: pair.hasTopTag,
-                    thumbnailURL: thumbnailURL
+                    thumbnailURL: thumbnailExists ? thumbnailURL : nil
                 )
             }
 
@@ -1294,13 +1304,171 @@ struct MainView: View {
     
     /// Stops security-scoped access for the current folder
     private func stopSecurityScopedAccess() {
+        // NEW: Stop folder monitoring first
+        #if os(macOS)
+        folderMonitor.stopMonitoring()
+        #endif
+
         guard isAccessingSecurityScope, let url = folderURL else {
             return
         }
-        
+
         url.stopAccessingSecurityScopedResource()
         isAccessingSecurityScope = false
         Logger.security.info("Security-scoped access stopped for: \(url.path)")
+    }
+
+    // MARK: - Folder Monitoring (NEW!)
+
+    #if os(macOS)
+    /// Starts monitoring the folder for external file system changes
+    private func startFolderMonitoring(for url: URL) {
+        Logger.ui.info("Starting folder monitoring for: \(url.lastPathComponent)")
+
+        folderMonitor.startMonitoring(url: url) {
+            // Called when file system changes are detected (debounced)
+            Logger.ui.info("External file system changes detected - rescanning...")
+            // Note: No [weak self] needed - MainView is a struct and owns folderMonitor
+            // The closure will be released when folderMonitor.stopMonitoring() is called
+            self.handleExternalFileChanges()
+        }
+    }
+    #endif
+
+    /// Handles external file system changes by intelligently rescanning
+    /// - Preserves current selection where possible
+    /// - Generates thumbnails for new images
+    /// - Selects next/previous image if current was deleted
+    private func handleExternalFileChanges() {
+        guard let folder = folderURL else {
+            Logger.ui.warning("No folder URL - cannot rescan")
+            return
+        }
+
+        // Store current selection info BEFORE rescan
+        let currentSelectedJPEGURL = selectedPair?.jpegURL
+        let currentSelectedIndex: Int? = {
+            guard let current = selectedPair else { return nil }
+            return pairs.firstIndex(of: current)
+        }()
+
+        // Rescan folder asynchronously
+        Task {
+            Logger.ui.info("🔄 Rescanning folder due to external changes...")
+
+            // 1. Load new pairs from folder (on background thread)
+            let (newPairs, newStatistics) = await Task.detached {
+                let fileService = await FileService(tagService: FinderTagService())
+                let pairs = await fileService.findImagePairs(in: folder)
+                let stats = await fileService.getFolderStatistics(in: folder)
+                return (pairs, stats)
+            }.value
+
+            // 2. Detect what changed
+            let oldJPEGURLs = Set(pairs.map { $0.jpegURL })
+            let newJPEGURLs = Set(newPairs.map { $0.jpegURL })
+            let addedURLs = newJPEGURLs.subtracting(oldJPEGURLs)
+            let removedURLs = oldJPEGURLs.subtracting(newJPEGURLs)
+
+            Logger.ui.info("📊 Changes detected: +\(addedURLs.count) added, -\(removedURLs.count) removed")
+
+            // 3. Create pairs with existing thumbnail URLs where possible
+            // IMPORTANT: Only set thumbnailURL if file actually exists, otherwise AsyncImage shows infinite loading
+            let pairsWithThumbnails: [ImagePair] = newPairs.map { pair in
+                let thumbnailURL = thumbnailService.getThumbnailURL(for: pair.jpegURL)
+                let thumbnailExists = FileManager.default.fileExists(atPath: thumbnailURL.path)
+
+                return ImagePair(
+                    jpegURL: pair.jpegURL,
+                    rawURL: pair.rawURL,
+                    hasTopTag: pair.hasTopTag,
+                    thumbnailURL: thumbnailExists ? thumbnailURL : nil
+                )
+            }
+
+            // 4. Update pairs and statistics on main thread
+            await MainActor.run {
+                pairs = pairsWithThumbnails
+                folderStatistics = newStatistics
+            }
+
+            // 5. Generate thumbnails for NEW images (if any added)
+            if addedURLs.isEmpty == false {
+                Logger.ui.info("🖼️ Generating thumbnails for \(addedURLs.count) new images...")
+
+                let finalPairs = await thumbnailService.generateMissingThumbnails(for: pairsWithThumbnails)
+
+                await MainActor.run {
+                    pairs = finalPairs
+                    Logger.ui.info("✅ Thumbnails generated for new images")
+                }
+            }
+
+            // 6. Handle selection preservation/update
+            await MainActor.run {
+                preserveOrUpdateSelection(
+                    currentSelectedURL: currentSelectedJPEGURL,
+                    currentIndex: currentSelectedIndex,
+                    wasDeleted: currentSelectedJPEGURL.map { removedURLs.contains($0) } ?? false
+                )
+
+                Logger.ui.info("✅ External rescan complete - \(pairs.count) pairs")
+            }
+        }
+    }
+
+    /// Intelligently preserves or updates the selection after a rescan
+    /// - Parameters:
+    ///   - currentSelectedURL: The JPEG URL of the previously selected pair
+    ///   - currentIndex: The index of the previously selected pair
+    ///   - wasDeleted: Whether the previously selected pair was deleted
+    private func preserveOrUpdateSelection(currentSelectedURL: URL?, currentIndex: Int?, wasDeleted: Bool) {
+        // Case 1: No pairs left
+        if pairs.isEmpty {
+            selectedPair = nil
+            rightImagePair = nil
+            leftImagePair = nil
+            Logger.ui.info("No pairs left - selection cleared")
+            return
+        }
+
+        // Case 2: No previous selection - select first
+        guard let previousURL = currentSelectedURL else {
+            selectedPair = pairs.first
+            Logger.ui.info("No previous selection - selected first pair")
+            return
+        }
+
+        // Case 3: Previous selection still exists - keep it
+        if !wasDeleted, let stillExists = pairs.first(where: { $0.jpegURL == previousURL }) {
+            selectedPair = stillExists
+            Logger.ui.info("Previous selection still exists - preserved")
+            return
+        }
+
+        // Case 4: Previous selection was deleted - select next or previous
+        if wasDeleted, let previousIndex = currentIndex {
+            // Try to select image at same index (= next image)
+            if previousIndex < pairs.count {
+                selectedPair = pairs[previousIndex]
+                Logger.ui.info("Selected next image after deletion (index \(previousIndex))")
+            }
+            // If that was the last image, select previous
+            else if previousIndex > 0 && !pairs.isEmpty {
+                selectedPair = pairs[pairs.count - 1]
+                Logger.ui.info("Selected previous image after deletion (last image)")
+            }
+            // Fallback: select first
+            else {
+                selectedPair = pairs.first
+                Logger.ui.info("Selected first image as fallback")
+            }
+        }
+        // Case 5: Unknown state - select first
+        else {
+            selectedPair = pairs.first
+            Logger.ui.info("Unknown state - selected first pair")
+        }
     }
 
     /// Jumps to the previous image in the list
