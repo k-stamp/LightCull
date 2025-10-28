@@ -58,6 +58,13 @@ struct MainView: View {
     // NEW: State for shortcuts overlay
     @State private var showShortcutsOverlay = false
 
+    // NEW: State for external app integration (macOS only)
+    #if os(macOS)
+    @State private var externalAppService = ExternalAppService()
+    @State private var showExternalAppError = false
+    @State private var externalAppErrorMessage = ""
+    #endif
+
     // Initialization for tests and previews
     init(pairs: [ImagePair] = [], folderURL: URL? = nil) {
         _pairs = State(initialValue: pairs)
@@ -184,6 +191,14 @@ struct MainView: View {
                         Divider()
                             .frame(height: 20)
 
+                        // NEW: Open with external app button (macOS only)
+                        #if os(macOS)
+                        openWithButtonView
+
+                        Divider()
+                            .frame(height: 20)
+                        #endif
+
                         // NEW: Info button for shortcuts
                         infoButton
                     }
@@ -211,6 +226,14 @@ struct MainView: View {
         .sheet(isPresented: $isGeneratingThumbnails) {
             thumbnailProgressSheetView
         }
+        // NEW: Error alert for external app operations (macOS only)
+        #if os(macOS)
+        .alert("Fehler", isPresented: $showExternalAppError) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(externalAppErrorMessage)
+        }
+        #endif
     }
     
     // MARK: - Thumbnail Progress Sheet (NEW!)
@@ -305,6 +328,37 @@ struct MainView: View {
         .help("Show keyboard shortcuts")
         #endif
     }
+
+    // MARK: - Open With Button (macOS only)
+
+    #if os(macOS)
+    /// Open with external app button for the toolbar
+    private var openWithButtonView: some View {
+        Menu {
+            // Luminar Neo option
+            Button(action: {
+                handleOpenWithLuminarNeo()
+            }) {
+                Label("Luminar Neo (JPEG bearbeiten)", systemImage: "photo")
+            }
+            .disabled(!externalAppService.isLuminarNeoInstalled())
+
+            // Fuji X Raw Studio option
+            Button(action: {
+                handleOpenWithFujiXRawStudio()
+            }) {
+                Label("Fuji X Raw Studio (RAW bearbeiten)", systemImage: "camera")
+            }
+            .disabled(!externalAppService.isFujiXRawStudioInstalled() || selectedPair?.rawURL == nil)
+
+        } label: {
+            Image(systemName: "arrow.up.forward.app")
+                .imageScale(.large)
+        }
+        .disabled(selectedPair == nil || isSplitViewActive)
+        .help("In externer App öffnen")
+    }
+    #endif
 
     /// Shortcuts overlay view
     private var shortcutsOverlayView: some View {
@@ -667,6 +721,55 @@ struct MainView: View {
             }
         }
     }
+
+    // MARK: - External App Handlers (macOS only)
+
+    #if os(macOS)
+    /// Opens the current JPEG in Luminar Neo after duplicating it
+    private func handleOpenWithLuminarNeo() {
+        guard let currentPair = selectedPair else {
+            return
+        }
+
+        // Duplicate and open
+        externalAppService.duplicateAndOpenWithLuminarNeo(jpegURL: currentPair.jpegURL) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    Logger.ui.info("Successfully opened JPEG in Luminar Neo: \(currentPair.jpegURL.lastPathComponent)")
+                case .failure(let error):
+                    // Show error alert
+                    self.externalAppErrorMessage = error.localizedDescription
+                    self.showExternalAppError = true
+                    Logger.ui.error("Failed to open in Luminar Neo: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+
+    /// Opens the current RAW file in Fuji X Raw Studio after duplicating it
+    private func handleOpenWithFujiXRawStudio() {
+        guard let currentPair = selectedPair,
+              let rawURL = currentPair.rawURL else {
+            return
+        }
+
+        // Duplicate and open
+        externalAppService.duplicateAndOpenWithFujiXRawStudio(rawURL: rawURL) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    Logger.ui.info("Successfully opened RAW in Fuji X Raw Studio: \(rawURL.lastPathComponent)")
+                case .failure(let error):
+                    // Show error alert
+                    self.externalAppErrorMessage = error.localizedDescription
+                    self.showExternalAppError = true
+                    Logger.ui.error("Failed to open in Fuji X Raw Studio: \(error.localizedDescription)")
+                }
+            }
+        }
+    }
+    #endif
 
     // MARK: - Delete Handlers (NEW!)
 
