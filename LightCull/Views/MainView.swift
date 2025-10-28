@@ -58,6 +58,10 @@ struct MainView: View {
     // NEW: State for shortcuts overlay
     @State private var showShortcutsOverlay = false
 
+    // NEW: State for tracking deleted JPEG-only files (for undo)
+    @State private var lastDeletedJPEGURL: URL? = nil
+    @State private var lastDeletedThumbnailURL: URL? = nil
+
     // NEW: State for external app integration (macOS only)
     #if os(macOS)
     @State private var externalAppService = ExternalAppService()
@@ -218,6 +222,9 @@ struct MainView: View {
         .onChange(of: folderURL) { oldValue, newValue in
             // Clear the move history when folder changes
             imageViewModel.clearMoveHistory()
+            // Clear delete history
+            lastDeletedJPEGURL = nil
+            lastDeletedThumbnailURL = nil
         }
         // NEW: Show rename sheet
         .sheet(isPresented: $showRenameSheet) {
@@ -705,6 +712,46 @@ struct MainView: View {
 
     // MARK: - Delete JPEG-only Handler (NEW!)
 
+    /// Stellt ein gelöschtes JPEG-only File aus dem Papierkorb wieder her
+    private func handleUndoDeleteJPEGOnly(trashedJPEGURL: URL) {
+        guard let folder = folderURL else {
+            Logger.ui.error("Kein Folder ausgewählt - kann Undo nicht ausführen")
+            return
+        }
+
+        // Originalen Dateinamen extrahieren
+        let originalFilename = trashedJPEGURL.lastPathComponent
+        let restoredURL = folder.appendingPathComponent(originalFilename)
+
+        do {
+            // JPEG aus Papierkorb zurück in Original-Folder verschieben
+            try FileManager.default.moveItem(at: trashedJPEGURL, to: restoredURL)
+            Logger.ui.info("JPEG wiederhergestellt aus Papierkorb: \(originalFilename)")
+
+            // Undo-State zurücksetzen
+            lastDeletedJPEGURL = nil
+            lastDeletedThumbnailURL = nil
+
+            // Folder rescannen um wiederhergestelltes JPEG anzuzeigen
+            rescanFolderSilently(folder) {
+                // Wiederhergestelltes JPEG auswählen
+                if let restoredPair = self.pairs.first(where: { $0.jpegURL == restoredURL }) {
+                    self.selectedPair = restoredPair
+                    Logger.ui.info("Wiederhergestelltes JPEG ausgewählt")
+                }
+            }
+
+        } catch {
+            Logger.ui.error("Fehler beim Wiederherstellen: \(error.localizedDescription)")
+            #if os(macOS)
+            DispatchQueue.main.async {
+                self.externalAppErrorMessage = "Fehler beim Wiederherstellen: \(error.localizedDescription)"
+                self.showExternalAppError = true
+            }
+            #endif
+        }
+    }
+
     /// Called when "Löschen" is clicked in context menu for JPEG-only files
     private func handleDeleteJPEGOnly(for pair: ImagePair) {
         // Sicherheitsprüfung: Nur JPEGs ohne RAW dürfen gelöscht werden
@@ -715,8 +762,15 @@ struct MainView: View {
 
         // JPEG-Datei löschen
         do {
-            try FileManager.default.trashItem(at: pair.jpegURL, resultingItemURL: nil)
-            Logger.ui.info("JPEG gelöscht (in Papierkorb): \(pair.jpegURL.lastPathComponent)")
+            var trashedURL: NSURL? = nil
+            try FileManager.default.trashItem(at: pair.jpegURL, resultingItemURL: &trashedURL)
+
+            // Papierkorb-URL für Undo speichern
+            if let trashedURL = trashedURL as URL? {
+                lastDeletedJPEGURL = trashedURL
+                lastDeletedThumbnailURL = pair.thumbnailURL
+                Logger.ui.info("JPEG gelöscht (in Papierkorb): \(pair.jpegURL.lastPathComponent) → \(trashedURL.path)")
+            }
 
             // Thumbnail auch löschen
             if let thumbnailURL = pair.thumbnailURL {
@@ -991,6 +1045,13 @@ struct MainView: View {
 
     /// Called when the "CMD+Z" shortcut is pressed
     private func handleUndo() {
+        // PRIORITÄT 1: JPEG-only Löschung rückgängig machen (neueste Operation)
+        if let trashedJPEGURL = lastDeletedJPEGURL {
+            handleUndoDeleteJPEGOnly(trashedJPEGURL: trashedJPEGURL)
+            return
+        }
+
+        // PRIORITÄT 2: Move-Operation rückgängig machen
         // 1. Is there even anything to undo?
         let canUndo: Bool = imageViewModel.canUndo()
 
