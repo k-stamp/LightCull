@@ -21,6 +21,9 @@ struct MainView: View {
     @State private var leftImagePair: ImagePair? = nil   // Reference image (fixed)
     @State private var rightImagePair: ImagePair? = nil  // Comparison image (changeable)
 
+    // NEW: Tinder mode state
+    @State private var isTinderModeActive: Bool = false
+
     // NEW: State for rename sheet
     @State private var showRenameSheet: Bool = false
 
@@ -65,21 +68,24 @@ struct MainView: View {
     }
     
     var body: some View {
-        NavigationSplitView {
-            // SIDEBAR: Folder selection and info
-            SidebarView(
-                folderURL: $folderURL,
-                pairs: $pairs,
-                currentMetadata: currentMetadata,
-                statistics: folderStatistics,
-                onFolderSelected: handleFolderSelection
-            )
-        } detail: {
-            // CONTENT AREA: Image preview on top + thumbnails on bottom
-            ZStack {
-                VStack(spacing: 0) {
-                    // CONDITIONAL: Show split view or single view based on mode
-                    if isSplitViewActive {
+        ZStack {
+            // Normal view with sidebar
+            if !isTinderModeActive {
+                NavigationSplitView {
+                    // SIDEBAR: Folder selection and info
+                    SidebarView(
+                        folderURL: $folderURL,
+                        pairs: $pairs,
+                        currentMetadata: currentMetadata,
+                        statistics: folderStatistics,
+                        onFolderSelected: handleFolderSelection
+                    )
+                } detail: {
+                    // CONTENT AREA: Image preview on top + thumbnails on bottom
+                    ZStack {
+                        VStack(spacing: 0) {
+                            // CONDITIONAL: Show split view or single view based on mode
+                            if isSplitViewActive {
                         // SPLIT VIEW MODE: Two images side-by-side
                         SplitViewContainer(
                             leftImagePair: leftImagePair,
@@ -153,6 +159,11 @@ struct MainView: View {
                     Button("Toggle Split View") { toggleSplitView() }
                         .keyboardShortcut("s", modifiers: .command)
                         .hidden()
+
+                    // NEW: Tinder mode toggle
+                    Button("Toggle Tinder Mode") { toggleTinderMode() }
+                        .keyboardShortcut("t", modifiers: .command)
+                        .hidden()
                 }
                 .frame(width: 0, height: 0)
             }
@@ -181,6 +192,14 @@ struct MainView: View {
                         // NEW: Split view toggle button
                         splitViewToggleButton
 
+                        #if os(iOS)
+                        Divider()
+                            .frame(height: 20)
+
+                        // NEW: Tinder mode toggle button (iOS only)
+                        tinderModeToggleButton
+                        #endif
+
                         Divider()
                             .frame(height: 20)
 
@@ -190,27 +209,50 @@ struct MainView: View {
                 }
             }
         }
-        // Automatically load metadata when the selected image changes
-        .onChange(of: selectedPair) { oldValue, newValue in
-                loadMetadataForSelectedPair(newValue)
-        }
-        // NEW: Cleanup when view disappears
-        .onDisappear {
-            stopSecurityScopedAccess()
-        }
-        // NEW: Clear move history when folder changes
-        .onChange(of: folderURL) { oldValue, newValue in
-            // Clear the move history when folder changes
-            imageViewModel.clearMoveHistory()
-        }
-        // NEW: Show rename sheet
-        .sheet(isPresented: $showRenameSheet) {
-            renameSheetView
-        }
-        // NEW: Show thumbnail progress sheet
-        .sheet(isPresented: $isGeneratingThumbnails) {
-            thumbnailProgressSheetView
-        }
+                // Automatically load metadata when the selected image changes
+                .onChange(of: selectedPair) { oldValue, newValue in
+                        loadMetadataForSelectedPair(newValue)
+                }
+                // NEW: Cleanup when view disappears
+                .onDisappear {
+                    stopSecurityScopedAccess()
+                }
+                // NEW: Clear move history when folder changes
+                .onChange(of: folderURL) { oldValue, newValue in
+                    // Clear the move history when folder changes
+                    imageViewModel.clearMoveHistory()
+                }
+                // NEW: Show rename sheet
+                .sheet(isPresented: $showRenameSheet) {
+                    renameSheetView
+                }
+                // NEW: Show thumbnail progress sheet
+                .sheet(isPresented: $isGeneratingThumbnails) {
+                    thumbnailProgressSheetView
+                }
+            } // End of !isTinderModeActive
+
+            // TINDER MODE: Fullscreen swipe interface
+            if isTinderModeActive {
+                TinderModeView(
+                    pairs: pairs,
+                    onExit: {
+                        deactivateTinderMode()
+                    },
+                    onArchive: { pair, completion in
+                        handleArchiveInTinderMode(pair, completion: completion)
+                    },
+                    onToggleTag: { pair, completion in
+                        handleToggleTagInTinderMode(pair, completion: completion)
+                    },
+                    onUndo: {
+                        handleUndo()
+                    }
+                )
+                .transition(.move(edge: .bottom))
+                .zIndex(10)
+            }
+        } // End of body ZStack
     }
     
     // MARK: - Thumbnail Progress Sheet (NEW!)
@@ -283,6 +325,21 @@ struct MainView: View {
         #if os(macOS)
         .help("Split View (⌘ S)")
         #endif
+    }
+
+    // MARK: - Tinder Mode Toggle (NEW!)
+
+    /// Tinder mode toggle button for the toolbar (iOS only)
+    private var tinderModeToggleButton: some View {
+        Button(action: {
+            toggleTinderMode()
+        }) {
+            Image(systemName: "heart.circle.fill")
+                .imageScale(.large)
+                .font(.title2)
+                .foregroundStyle(isTinderModeActive ? .pink : .primary)
+        }
+        .disabled(pairs.isEmpty)
     }
 
     // MARK: - Info Button & Shortcuts Overlay (NEW!)
@@ -1230,15 +1287,100 @@ struct MainView: View {
         }
     }
     
+    // MARK: - Tinder Mode Logic (NEW!)
+
+    /// Toggles Tinder mode on/off
+    private func toggleTinderMode() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isTinderModeActive.toggle()
+        }
+
+        if isTinderModeActive {
+            activateTinderMode()
+        } else {
+            deactivateTinderMode()
+        }
+    }
+
+    /// Activates Tinder mode
+    private func activateTinderMode() {
+        Logger.ui.info("Activating Tinder mode")
+
+        // Deactivate other modes
+        if isSplitViewActive {
+            deactivateSplitView()
+        }
+
+        // Clear selections
+        selectedPair = nil
+        selectedPairs.removeAll()
+    }
+
+    /// Deactivates Tinder mode
+    private func deactivateTinderMode() {
+        Logger.ui.info("Deactivating Tinder mode")
+
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isTinderModeActive = false
+        }
+
+        // Select first image again
+        selectedPair = pairs.first
+    }
+
+    /// Handles archive action in Tinder mode
+    private func handleArchiveInTinderMode(_ pair: ImagePair, completion: @escaping () -> Void) {
+        guard let folder = folderURL else {
+            Logger.ui.notice("No folder selected - cannot archive in Tinder mode")
+            completion()
+            return
+        }
+
+        Logger.ui.debug("Tinder mode: Archiving image: \(pair.jpegURL.lastPathComponent)")
+
+        // Call ViewModel to archive the image
+        imageViewModel.archiveImagePair(pair: pair, in: folder) { success in
+            if success {
+                Logger.ui.info("Archive successful (Tinder mode)")
+
+                // Rescan folder to update pairs array
+                rescanFolderWithoutThumbnails(folder) {
+                    // Call completion to allow TinderModeView to move to next image
+                    completion()
+                }
+            } else {
+                Logger.ui.error("Archive failed (Tinder mode)")
+                // Still call completion to prevent UI from getting stuck
+                completion()
+            }
+        }
+    }
+
+    /// Handles tag toggle in Tinder mode
+    private func handleToggleTagInTinderMode(_ pair: ImagePair, completion: @escaping () -> Void) {
+        Logger.ui.debug("Tinder mode: Toggling TOP tag for: \(pair.jpegURL.lastPathComponent)")
+
+        // Call ViewModel to toggle tag
+        imageViewModel.toggleTopTag(for: pair) { updatedPair in
+            DispatchQueue.main.async {
+                // Update the pair in the array
+                updateImagePair(updatedPair)
+
+                // Call completion to allow TinderModeView to move to next image
+                completion()
+            }
+        }
+    }
+
     // MARK: - Metadata Loading
-    
+
     private func loadMetadataForSelectedPair(_ pair: ImagePair?) {
         // If no image is selected, reset metadata
         guard let pair = pair else {
             currentMetadata = nil
             return
         }
-        
+
         currentMetadata = metadataService.extractMetadata(from: pair.jpegURL)
 
         // Debug output (you can remove this later)
@@ -1248,8 +1390,8 @@ struct MainView: View {
             Logger.ui.debug("No metadata available for: \(pair.jpegURL.lastPathComponent)")
         }
     }
-    
-    
+
+
 }
 
 // MARK: - Previews
