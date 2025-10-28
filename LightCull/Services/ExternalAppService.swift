@@ -23,110 +23,135 @@ class ExternalAppService {
         return FileManager.default.fileExists(atPath: "/Applications/FUJIFILM X RAW STUDIO.app")
     }
 
-    // MARK: - Öffnen mit Luminar Neo
+    // MARK: - Duplizieren
 
-    /// Dupliziert das JPEG und öffnet es mit Luminar Neo
-    func duplicateAndOpenWithLuminarNeo(jpegURL: URL, completion: @escaping (Result<Void, ExternalAppError>) -> Void) {
-        // Prüfen ob App installiert ist
+    /// Dupliziert das JPEG für Luminar Neo
+    /// - Returns: URL des duplizierten JPEGs
+    func duplicateJPEGForLuminarNeo(jpegURL: URL) throws -> URL {
         guard isLuminarNeoInstalled() else {
-            completion(.failure(.appNotInstalled("Luminar Neo")))
-            return
+            throw ExternalAppError.appNotInstalled("Luminar Neo")
         }
 
-        // Duplikat erstellen mit eindeutigem Namen
-        do {
-            let duplicateURL = try createUniqueDuplicateURL(
-                originalURL: jpegURL,
-                suffix: "ReEditet-LuminarNEO",
-                extension: "jpg"
-            )
+        let duplicateURL = try createUniqueDuplicateURL(
+            originalURL: jpegURL,
+            suffix: "ReEditet_LuminarNEO",
+            extension: "jpg"
+        )
 
-            // Datei kopieren
-            try FileManager.default.copyItem(at: jpegURL, to: duplicateURL)
+        // Datei kopieren
+        try FileManager.default.copyItem(at: jpegURL, to: duplicateURL)
 
-            // Mit Luminar Neo öffnen
-            let appURL = URL(fileURLWithPath: "/Applications/Luminar Neo.app")
-            let configuration = NSWorkspace.OpenConfiguration()
+        return duplicateURL
+    }
 
-            NSWorkspace.shared.open(
-                [duplicateURL],
-                withApplicationAt: appURL,
-                configuration: configuration
-            ) { app, error in
-                if let error = error {
-                    completion(.failure(.failedToOpen(error.localizedDescription)))
-                } else {
-                    completion(.success(()))
-                }
+    /// Dupliziert die RAW-Datei für Fuji X Raw Studio
+    /// - Returns: URL der duplizierten RAW-Datei
+    func duplicateRAWForFujiXRawStudio(rawURL: URL) throws -> URL {
+        guard isFujiXRawStudioInstalled() else {
+            throw ExternalAppError.appNotInstalled("FUJIFILM X RAW STUDIO")
+        }
+
+        let originalExtension = rawURL.pathExtension
+        let duplicateURL = try createUniqueDuplicateURL(
+            originalURL: rawURL,
+            suffix: "ReEditet_FujiXRawStudio",
+            extension: originalExtension
+        )
+
+        // Datei kopieren
+        try FileManager.default.copyItem(at: rawURL, to: duplicateURL)
+
+        return duplicateURL
+    }
+
+    // MARK: - Öffnen mit externer App
+
+    /// Öffnet eine Datei mit Luminar Neo
+    func openWithLuminarNeo(fileURL: URL, completion: @escaping (Result<Void, ExternalAppError>) -> Void) {
+        let appURL = URL(fileURLWithPath: "/Applications/Luminar Neo.app")
+        let configuration = NSWorkspace.OpenConfiguration()
+
+        NSWorkspace.shared.open(
+            [fileURL],
+            withApplicationAt: appURL,
+            configuration: configuration
+        ) { app, error in
+            if let error = error {
+                completion(.failure(.failedToOpen(error.localizedDescription)))
+            } else {
+                completion(.success(()))
             }
-
-        } catch {
-            completion(.failure(.failedToDuplicate(error.localizedDescription)))
         }
     }
 
-    // MARK: - Öffnen mit Fuji X Raw Studio
+    /// Öffnet eine Datei mit Fuji X Raw Studio
+    func openWithFujiXRawStudio(fileURL: URL, completion: @escaping (Result<Void, ExternalAppError>) -> Void) {
+        let appURL = URL(fileURLWithPath: "/Applications/FUJIFILM X RAW STUDIO.app")
 
-    /// Dupliziert die RAW-Datei und öffnet sie mit Fuji X Raw Studio
-    func duplicateAndOpenWithFujiXRawStudio(rawURL: URL, completion: @escaping (Result<Void, ExternalAppError>) -> Void) {
-        // Prüfen ob App installiert ist
-        guard isFujiXRawStudioInstalled() else {
-            completion(.failure(.appNotInstalled("FUJIFILM X RAW STUDIO")))
-            return
-        }
+        // Methode 1: Versuche die Datei direkt zu öffnen
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.activates = true
+        configuration.promptsUserIfNeeded = true
 
-        // Duplikat erstellen mit eindeutigem Namen (behält .RAF extension)
-        do {
-            let originalExtension = rawURL.pathExtension
-            let duplicateURL = try createUniqueDuplicateURL(
-                originalURL: rawURL,
-                suffix: "ReEditet-FujiXRawStudio",
-                extension: originalExtension
-            )
+        NSWorkspace.shared.open(
+            [fileURL],
+            withApplicationAt: appURL,
+            configuration: configuration
+        ) { app, error in
+            if error != nil {
+                // Methode 2: Falls fehlgeschlagen, versuche erst die App zu starten
+                let launchConfiguration = NSWorkspace.OpenConfiguration()
+                launchConfiguration.activates = true
 
-            // Datei kopieren
-            try FileManager.default.copyItem(at: rawURL, to: duplicateURL)
+                NSWorkspace.shared.openApplication(at: appURL, configuration: launchConfiguration) { app, launchError in
+                    if let launchError = launchError {
+                        completion(.failure(.failedToOpen("Fehler beim Starten der App: \(launchError.localizedDescription)")))
+                    } else {
+                        // App erfolgreich gestartet, warte kurz und versuche dann die Datei zu öffnen
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+                            let openConfig = NSWorkspace.OpenConfiguration()
+                            openConfig.activates = true
 
-            // Mit Fuji X Raw Studio öffnen
-            let appURL = URL(fileURLWithPath: "/Applications/FUJIFILM X RAW STUDIO.app")
-            let configuration = NSWorkspace.OpenConfiguration()
-
-            NSWorkspace.shared.open(
-                [duplicateURL],
-                withApplicationAt: appURL,
-                configuration: configuration
-            ) { app, error in
-                if let error = error {
-                    completion(.failure(.failedToOpen(error.localizedDescription)))
-                } else {
-                    completion(.success(()))
+                            NSWorkspace.shared.open(
+                                [fileURL],
+                                withApplicationAt: appURL,
+                                configuration: openConfig
+                            ) { _, openError in
+                                if let openError = openError {
+                                    completion(.failure(.failedToOpen("Datei konnte nicht geöffnet werden: \(openError.localizedDescription)")))
+                                } else {
+                                    completion(.success(()))
+                                }
+                            }
+                        }
+                    }
                 }
+            } else {
+                completion(.success(()))
             }
-
-        } catch {
-            completion(.failure(.failedToDuplicate(error.localizedDescription)))
         }
     }
 
     // MARK: - Private Helper
 
     /// Erstellt eine eindeutige URL für das Duplikat mit automatischer Nummerierung bei Konflikten
-    /// Beispiel: OriginalName-ReEditet-LuminarNEO.jpg, bei Konflikt: -2.jpg, -3.jpg, etc.
+    /// Beispiel: OriginalName(ReEditet_LuminarNEO).jpg, bei Konflikt: OriginalName(ReEditet_LuminarNEO2).jpg, etc.
     private func createUniqueDuplicateURL(originalURL: URL, suffix: String, extension: String) throws -> URL {
         let directory = originalURL.deletingLastPathComponent()
         let originalFilename = originalURL.deletingPathExtension().lastPathComponent
 
-        // Basis-Dateiname: OriginalName-Suffix.extension
-        let baseName = "\(originalFilename)-\(suffix)"
-        var counter = 1
+        // Basis-Dateiname: OriginalName(Suffix).extension
+        var baseName = "\(originalFilename)(\(suffix))"
+        var counter = 2
         var candidateURL = directory.appendingPathComponent(baseName).appendingPathExtension(`extension`)
 
-        // Wenn Datei existiert, füge Nummer hinzu: -2, -3, etc.
+        // Wenn Datei existiert, füge Nummer hinzu: (Suffix2), (Suffix3), etc.
         while FileManager.default.fileExists(atPath: candidateURL.path) {
-            counter += 1
+            baseName = "\(originalFilename)(\(suffix)\(counter))"
             candidateURL = directory
-                .appendingPathComponent("\(baseName)-\(counter)")
+                .appendingPathComponent(baseName)
                 .appendingPathExtension(`extension`)
+            counter += 1
         }
 
         return candidateURL

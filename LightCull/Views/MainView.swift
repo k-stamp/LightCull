@@ -125,7 +125,8 @@ struct MainView: View {
                             selectedLeftPair: $leftImagePair,
                             selectedRightPair: $rightImagePair,
                             isSplitViewActive: isSplitViewActive,
-                            onRenameSelected: handleRenameButtonClicked
+                            onRenameSelected: handleRenameButtonClicked,
+                            onDeleteJPEGOnly: handleDeleteJPEGOnly
                         )
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
@@ -702,6 +703,58 @@ struct MainView: View {
         return result
     }
 
+    // MARK: - Delete JPEG-only Handler (NEW!)
+
+    /// Called when "Löschen" is clicked in context menu for JPEG-only files
+    private func handleDeleteJPEGOnly(for pair: ImagePair) {
+        // Sicherheitsprüfung: Nur JPEGs ohne RAW dürfen gelöscht werden
+        guard pair.rawURL == nil else {
+            Logger.ui.error("Versuch, Pair mit RAW zu löschen - nicht erlaubt!")
+            return
+        }
+
+        // JPEG-Datei löschen
+        do {
+            try FileManager.default.trashItem(at: pair.jpegURL, resultingItemURL: nil)
+            Logger.ui.info("JPEG gelöscht (in Papierkorb): \(pair.jpegURL.lastPathComponent)")
+
+            // Thumbnail auch löschen
+            if let thumbnailURL = pair.thumbnailURL {
+                try? FileManager.default.removeItem(at: thumbnailURL)
+            }
+
+            // Pair aus Array entfernen
+            if let index = pairs.firstIndex(of: pair) {
+                pairs.remove(at: index)
+
+                // Wenn das gelöschte Pair ausgewählt war, Auswahl anpassen
+                if selectedPair?.id == pair.id {
+                    // Nächstes oder vorheriges Pair auswählen
+                    if index < pairs.count {
+                        selectedPair = pairs[index]  // Nächstes
+                    } else if !pairs.isEmpty {
+                        selectedPair = pairs[index - 1]  // Vorheriges
+                    } else {
+                        selectedPair = nil  // Keine Pairs mehr
+                    }
+                }
+            }
+
+            // Statistiken aktualisieren
+            refreshStatistics()
+
+        } catch {
+            // Fehler beim Löschen
+            DispatchQueue.main.async {
+                #if os(macOS)
+                self.externalAppErrorMessage = "Fehler beim Löschen: \(error.localizedDescription)"
+                self.showExternalAppError = true
+                #endif
+            }
+            Logger.ui.error("Fehler beim Löschen: \(error.localizedDescription)")
+        }
+    }
+
     /// Rescans the folder and updates the pairs
     /// - Parameters:
     ///   - folder: The folder to rescan
@@ -722,49 +775,95 @@ struct MainView: View {
         }
     }
 
-    // MARK: - External App Handlers (macOS only)
+    /// Rescans the folder silently (without showing progress sheet)
+    /// Used for quick rescans like after duplicating a single file
+    /// - Parameters:
+    ///   - folder: The folder to rescan
+    ///   - completion: Optional callback after rescan completes (on main thread)
+    private func rescanFolderSilently(_ folder: URL, completion: (() -> Void)? = nil) {
+        // Rescan asynchronously (to prevent blocking main thread)
+        // NO progress sheet shown!
+        Task {
+            await loadPairsAndGenerateThumbnails(for: folder)
 
-    #if os(macOS)
-    /// Opens the current JPEG in Luminar Neo after duplicating it
-    private func handleOpenWithLuminarNeo() {
-        guard let currentPair = selectedPair else {
-            return
-        }
-
-        // Duplicate and open
-        externalAppService.duplicateAndOpenWithLuminarNeo(jpegURL: currentPair.jpegURL) { result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success:
-                    Logger.ui.info("Successfully opened JPEG in Luminar Neo: \(currentPair.jpegURL.lastPathComponent)")
-                case .failure(let error):
-                    // Show error alert
-                    self.externalAppErrorMessage = error.localizedDescription
-                    self.showExternalAppError = true
-                    Logger.ui.error("Failed to open in Luminar Neo: \(error.localizedDescription)")
-                }
+            // After rescan, call completion on main thread
+            await MainActor.run {
+                completion?()
             }
         }
     }
 
-    /// Opens the current RAW file in Fuji X Raw Studio after duplicating it
+    // MARK: - External App Handlers (macOS only)
+
+    #if os(macOS)
+    /// Workflow: JPEG duplizieren → Thumbnail Bar aktualisieren → Duplikat auswählen → Luminar Neo öffnen
+    private func handleOpenWithLuminarNeo() {
+        guard let currentPair = selectedPair,
+              let folder = folderURL else {
+            return
+        }
+
+        // 1. Duplikat erstellen (synchron, damit wir die URL sofort haben)
+        let duplicateURL: URL
+        do {
+            duplicateURL = try externalAppService.duplicateJPEGForLuminarNeo(jpegURL: currentPair.jpegURL)
+            Logger.ui.info("JPEG dupliziert: \(duplicateURL.lastPathComponent)")
+        } catch {
+            // Fehler beim Duplizieren
+            DispatchQueue.main.async {
+                self.externalAppErrorMessage = (error as? ExternalAppError)?.localizedDescription ?? error.localizedDescription
+                self.showExternalAppError = true
+            }
+            return
+        }
+
+        // 2. Folder rescannen (STILL - ohne Modal Sheet, mit Animation in Thumbnail Bar)
+        rescanFolderSilently(folder) {
+            // 3. Nach Rescan: Duplikat in pairs finden und auswählen
+            if let duplicatePair = self.pairs.first(where: { $0.jpegURL == duplicateURL }) {
+                // Animation: Auswahl ändert sich
+                self.selectedPair = duplicatePair
+                Logger.ui.info("Duplikat ausgewählt: \(duplicatePair.jpegURL.lastPathComponent)")
+
+                // 4. Nach kurzer Verzögerung (für Animation): App öffnen
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    self.externalAppService.openWithLuminarNeo(fileURL: duplicateURL) { result in
+                        DispatchQueue.main.async {
+                            switch result {
+                            case .success:
+                                Logger.ui.info("Luminar Neo geöffnet mit: \(duplicateURL.lastPathComponent)")
+                            case .failure(let error):
+                                self.externalAppErrorMessage = error.localizedDescription
+                                self.showExternalAppError = true
+                                Logger.ui.error("Fehler beim Öffnen: \(error.localizedDescription)")
+                            }
+                        }
+                    }
+                }
+            } else {
+                // Duplikat nicht gefunden (sollte nicht passieren)
+                Logger.ui.error("Duplikat nicht in pairs gefunden: \(duplicateURL.lastPathComponent)")
+            }
+        }
+    }
+
+    /// Öffnet das Original-RAW direkt mit Fuji X Raw Studio (ohne Duplizierung)
     private func handleOpenWithFujiXRawStudio() {
         guard let currentPair = selectedPair,
               let rawURL = currentPair.rawURL else {
             return
         }
 
-        // Duplicate and open
-        externalAppService.duplicateAndOpenWithFujiXRawStudio(rawURL: rawURL) { result in
+        // Original-RAW direkt öffnen (keine Duplizierung!)
+        externalAppService.openWithFujiXRawStudio(fileURL: rawURL) { result in
             DispatchQueue.main.async {
                 switch result {
                 case .success:
-                    Logger.ui.info("Successfully opened RAW in Fuji X Raw Studio: \(rawURL.lastPathComponent)")
+                    Logger.ui.info("Fuji X Raw Studio geöffnet mit Original: \(rawURL.lastPathComponent)")
                 case .failure(let error):
-                    // Show error alert
                     self.externalAppErrorMessage = error.localizedDescription
                     self.showExternalAppError = true
-                    Logger.ui.error("Failed to open in Fuji X Raw Studio: \(error.localizedDescription)")
+                    Logger.ui.error("Fehler beim Öffnen: \(error.localizedDescription)")
                 }
             }
         }
